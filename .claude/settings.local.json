@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/danil/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/2.5.0/**)",
+      "Bash(python skills/ui-ux-pro-max/scripts/search.py \"HR recruitment SaaS procurement specialists B2B Russia government\" --design-system -f markdown)",
+      "Bash(python src/ui-ux-pro-max/scripts/search.py \"HR recruitment SaaS procurement B2B government Russia\" --design-system -f markdown)",
+      "Bash(python src/ui-ux-pro-max/scripts/search.py \"dashboard SaaS admin table accessibility\" --domain ux -n 8)",
+      "Bash(python src/ui-ux-pro-max/scripts/search.py \"sidebar navigation active state\" --domain ux -n 5)",
+      "Bash(npx tsc *)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(npm run *)",
+      "Bash(PORT=55999 npm run dev)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:55999)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp"
+    ]
+  }
+}

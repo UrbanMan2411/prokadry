@@ -1,0 +1,404 @@
+// ПРОкадры — Database Schema
+// SQLite (demo) via libsql
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENUMS — stored as String in SQLite
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum Role {
+  EMPLOYER
+  SEEKER
+  ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum ResumeStatus {
+  DRAFT
+  PENDING
+  ACTIVE
+  REJECTED
+  ARCHIVED
+}
+
+enum VacancyStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum InvitationStatus {
+  SENT
+  VIEWED
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum EmployerStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+}
+
+enum DictCategory {
+  POSITION
+  REGION
+  EDUCATION
+  WORK_MODE
+  ACTIVITY_AREA
+  TEST
+  SPECIAL_STATUS
+  SKILL
+}
+
+enum AuditAction {
+  RESUME_CREATED
+  RESUME_UPDATED
+  RESUME_SUBMITTED
+  RESUME_APPROVED
+  RESUME_REJECTED
+  RESUME_ARCHIVED
+  EMPLOYER_REGISTERED
+  EMPLOYER_APPROVED
+  EMPLOYER_SUSPENDED
+  VACANCY_CREATED
+  VACANCY_UPDATED
+  VACANCY_ARCHIVED
+  INVITATION_SENT
+  INVITATION_WITHDRAWN
+  FAVORITE_ADDED
+  FAVORITE_REMOVED
+  MESSAGE_SENT
+  USER_LOGIN
+  USER_LOGOUT
+  USER_PASSWORD_CHANGED
+  DICT_ITEM_CREATED
+  DICT_ITEM_UPDATED
+  DICT_ITEM_DISABLED
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// USERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  role         Role
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  lastLoginAt  DateTime?
+
+  employer     Employer?
+  resume       Resume?
+
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+  auditLogs        AuditLog[]
+
+  @@index([email])
+  @@index([role])
+  @@index([isActive])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EMPLOYER
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Employer {
+  id          String         @id @default(cuid())
+  userId      String         @unique
+  user        User           @relation(fields: [userId], references: [id])
+
+  name        String
+  inn         String         @unique
+  ogrn        String?
+  region      String
+  city        String
+  address     String?
+  contactName String
+  phone       String
+  website     String?
+  description String?
+  logoUrl     String?
+
+  status      EmployerStatus @default(PENDING)
+  registeredAt DateTime      @default(now())
+  approvedAt  DateTime?
+  approvedById String?
+
+  vacancies   Vacancy[]
+  favorites   Favorite[]
+
+  @@index([status])
+  @@index([region])
+  @@index([inn])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RESUME
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Resume {
+  id          String       @id @default(cuid())
+  userId      String       @unique
+  user        User         @relation(fields: [userId], references: [id])
+
+  firstName   String
+  lastName    String
+  patronymic  String?
+  gender      Gender
+  birthDate   DateTime
+
+  city        String
+  region      String
+
+  position    String
+  salary      Int?
+  experience  Int          @default(0)
+  education   String
+  workMode    String
+  about       String?
+  photoUrl    String?
+  hasPhoto    Boolean      @default(false)
+
+  status      ResumeStatus @default(DRAFT)
+  publishedAt DateTime?
+  rejectReason String?
+  moderatedById String?
+  moderatedAt DateTime?
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  workExperiences  WorkExperience[]
+  activityAreas    ResumeActivityArea[]
+  tests            ResumeTest[]
+  specialStatuses  ResumeSpecialStatus[]
+  invitations      Invitation[]
+  favorites        Favorite[]
+
+  @@index([status])
+  @@index([region])
+  @@index([position])
+  @@index([salary])
+  @@index([experience])
+  @@index([gender])
+}
+
+model WorkExperience {
+  id          Int      @id @default(autoincrement())
+  resumeId    String
+  resume      Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  company     String
+  role        String
+  fromMonth   String
+  toMonth     String?
+  isCurrent   Boolean  @default(false)
+  description String?
+  sortOrder   Int      @default(0)
+
+  @@index([resumeId])
+}
+
+model ResumeActivityArea {
+  resumeId   String
+  resume     Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  dictItemId String
+  dictItem   DictItem @relation(fields: [dictItemId], references: [id])
+
+  @@id([resumeId, dictItemId])
+  @@index([dictItemId])
+}
+
+model ResumeTest {
+  resumeId   String
+  resume     Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  dictItemId String
+  dictItem   DictItem @relation(fields: [dictItemId], references: [id])
+
+  passedAt   DateTime?
+
+  @@id([resumeId, dictItemId])
+  @@index([dictItemId])
+}
+
+model ResumeSpecialStatus {
+  resumeId    String
+  resume      Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  dictItemId  String
+  dictItem    DictItem @relation(fields: [dictItemId], references: [id])
+
+  confirmedAt DateTime?
+  documentRef String?
+
+  @@id([resumeId, dictItemId])
+  @@index([dictItemId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DICTIONARIES
+// ─────────────────────────────────────────────────────────────────────────────
+
+model DictItem {
+  id        String       @id @default(cuid())
+  category  DictCategory
+  value     String
+  label     String
+  sortOrder Int          @default(0)
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  resumeActivityAreas   ResumeActivityArea[]
+  resumeTests           ResumeTest[]
+  resumeSpecialStatuses ResumeSpecialStatus[]
+  vacancySkills         VacancySkill[]
+
+  @@unique([category, value])
+  @@index([category, isActive, sortOrder])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VACANCY
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Vacancy {
+  id          String        @id @default(cuid())
+  employerId  String
+  employer    Employer      @relation(fields: [employerId], references: [id])
+
+  title       String
+  department  String?
+  city        String
+  region      String
+  workMode    String
+  salaryFrom  Int?
+  salaryTo    Int?
+  description String?
+  status      VacancyStatus @default(DRAFT)
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  archivedAt  DateTime?
+
+  skills      VacancySkill[]
+  invitations Invitation[]
+
+  @@index([employerId, status])
+  @@index([status, region])
+}
+
+model VacancySkill {
+  vacancyId  String
+  vacancy    Vacancy  @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
+  dictItemId String
+  dictItem   DictItem @relation(fields: [dictItemId], references: [id])
+
+  @@id([vacancyId, dictItemId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INVITATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Invitation {
+  id           String           @id @default(cuid())
+  resumeId     String
+  resume       Resume           @relation(fields: [resumeId], references: [id])
+  vacancyId    String
+  vacancy      Vacancy          @relation(fields: [vacancyId], references: [id])
+
+  message      String
+  replyMessage String?
+  status       InvitationStatus @default(SENT)
+
+  sentAt       DateTime         @default(now())
+  viewedAt     DateTime?
+  respondedAt  DateTime?
+  withdrawnAt  DateTime?
+
+  messages     Message[]
+
+  @@unique([resumeId, vacancyId])
+  @@index([resumeId, status])
+  @@index([vacancyId, status])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MESSAGES
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Message {
+  id           String      @id @default(cuid())
+  senderId     String
+  sender       User        @relation("SentMessages",     fields: [senderId],    references: [id])
+  recipientId  String
+  recipient    User        @relation("ReceivedMessages", fields: [recipientId], references: [id])
+
+  invitationId String?
+  invitation   Invitation? @relation(fields: [invitationId], references: [id], onDelete: SetNull)
+
+  text         String
+  isRead       Boolean     @default(false)
+  readAt       DateTime?
+  createdAt    DateTime    @default(now())
+
+  @@index([recipientId, isRead])
+  @@index([senderId])
+  @@index([invitationId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FAVORITES
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Favorite {
+  employerId String
+  employer   Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  resumeId   String
+  resume     Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+  note       String?
+
+  @@id([employerId, resumeId])
+  @@index([employerId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUDIT LOG
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         Int         @id @default(autoincrement())
+  userId     String?
+  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     AuditAction
+  entityType String
+  entityId   String?
+  detail     String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime    @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([entityType, entityId])
+}
