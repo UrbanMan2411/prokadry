@@ -14,8 +14,8 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL('/auth', req.url));
   }
 
-  // Redirect logged-in users away from auth page and landing to dashboard
-  if (session && (isAuthPage || pathname === '/')) {
+  // Redirect logged-in users away from auth page to dashboard
+  if (session && isAuthPage) {
     return NextResponse.redirect(new URL('/dashboard', req.url));
   }
 
