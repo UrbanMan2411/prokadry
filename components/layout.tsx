@@ -20,6 +20,7 @@ const NAV_EMPLOYER: NavItem[] = [
   { id: 'messages',    label: 'Сообщения',       icon: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z' },
   { id: 'invitations', label: 'Приглашения',     icon: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
   { id: 'company',     label: 'Профиль компании', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
+  { id: 'regions',     label: 'Регионы',          icon: 'M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
 ];
 
 const NAV_SEEKER: NavItem[] = [
@@ -52,9 +53,10 @@ function NavIcon({ d }: { d: string }) {
 }
 
 export function Sidebar({
-  role, page, setPage, open, onClose,
+  role, page, setPage, open, onClose, badges = {},
 }: {
   role: Role; page: Page; setPage: (p: Page) => void; open: boolean; onClose: () => void;
+  badges?: Record<string, number>;
 }) {
   const nav = role === 'employer' ? NAV_EMPLOYER : role === 'seeker' ? NAV_SEEKER : NAV_ADMIN;
   return (
@@ -91,16 +93,25 @@ export function Sidebar({
         </div>
 
         <nav className="flex-1 py-4 px-3 space-y-0.5">
-          {nav.map(item => (
-            <button
-              key={item.id}
-              onClick={() => { setPage(item.id); onClose(); }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 text-left ${page === item.id ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
-            >
-              <NavIcon d={item.icon} />
-              {item.label}
-            </button>
-          ))}
+          {nav.map(item => {
+            const badgeCount = badges[item.id] ?? 0;
+            const isActive = page === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => { setPage(item.id); onClose(); }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 text-left ${isActive ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
+              >
+                <NavIcon d={item.icon} />
+                <span className="flex-1 truncate">{item.label}</span>
+                {badgeCount > 0 && (
+                  <span className={`min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full text-[10px] font-bold leading-none flex-shrink-0 ${isActive ? 'bg-white/25 text-white' : 'bg-blue-500 text-white'}`}>
+                    {badgeCount > 99 ? '99+' : badgeCount}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </nav>
 
         <div className="px-3 py-4 border-t border-slate-800">
@@ -168,14 +179,15 @@ export function Header({
 }
 
 export function AppShell({
-  role, email, page, setPage, children,
+  role, email, page, setPage, children, badges,
 }: {
   role: Role; email: string; page: Page; setPage: (p: Page) => void; children: ReactNode;
+  badges?: Record<string, number>;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
-      <Sidebar role={role} page={page} setPage={setPage} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar role={role} page={page} setPage={setPage} open={sidebarOpen} onClose={() => setSidebarOpen(false)} badges={badges} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header role={role} email={email} onMenuClick={() => setSidebarOpen(true)} />
         <main className="flex-1 overflow-y-auto">{children}</main>

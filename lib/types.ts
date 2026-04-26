@@ -134,3 +134,48 @@ export interface MockDataStore {
   DICTIONARIES: Dictionaries;
   AUDIT_LOGS: AuditLog[];
 }
+
+// ── Contact Exchange (Task 4) ──────────────────────────────────────────────
+export type ContactStatus = 'hidden' | 'requested' | 'opened' | 'detected_in_message';
+export type ContactInitiator = 'employer' | 'candidate' | 'system';
+export type DetectedContactType = 'phone' | 'email' | 'messenger' | 'link' | null;
+
+export interface ContactExchange {
+  id: string;
+  candidateId: string;
+  employerId: string;
+  vacancyId?: string;
+  status: ContactStatus;
+  initiatedBy: ContactInitiator;
+  detectedType: DetectedContactType;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Parsed Source (Task 7) ─────────────────────────────────────────────────
+export type ParsedSourceStatus = 'active' | 'paused' | 'error' | 'testing';
+export type ParsedSourceType =
+  | 'vacancies' | 'resumes' | 'eis' | 'regional_employment'
+  | 'regulatory' | 'enrichment' | 'statistics' | 'social_support';
+
+export interface ParsedSource {
+  id: string;
+  name: string;
+  type: ParsedSourceType;
+  url: string;
+  status: ParsedSourceStatus;
+  lastSyncAt: string | null;
+  updateFrequency: string;
+  legalNotes: string;
+}
+
+// ── Region Stat (Task 6) ───────────────────────────────────────────────────
+export interface RegionStat {
+  name: string;
+  region: string;
+  vacanciesCount: number;
+  resumesCount: number;
+  avgSalary: number;
+  supplyDemandIndex: number;
+  rating: number;
+}

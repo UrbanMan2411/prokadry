@@ -1,19 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { decrypt } from '@/lib/session';
+import { decryptToken } from '@/lib/session-core';
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const isAuthPage = pathname.startsWith('/auth');
+  const isDashboard = pathname.startsWith('/dashboard');
 
   const token = req.cookies.get('prokadry_session')?.value;
-  const session = token ? await decrypt(token) : null;
+  const session = token ? await decryptToken(token) : null;
 
-  if (!session && !isAuthPage) {
+  // Protect dashboard — redirect to login if no session
+  if (isDashboard && !session) {
     return NextResponse.redirect(new URL('/auth', req.url));
   }
 
-  if (session && isAuthPage) {
-    return NextResponse.redirect(new URL('/', req.url));
+  // Redirect logged-in users away from auth page and landing to dashboard
+  if (session && (isAuthPage || pathname === '/')) {
+    return NextResponse.redirect(new URL('/dashboard', req.url));
   }
 
   return NextResponse.next();

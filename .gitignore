@@ -38,6 +38,16 @@ yarn-error.log*
 # vercel
 .vercel
 
+# screenshots (dev artifacts)
+*.png
+*.jpg
+*.jpeg
+
+# claude skills cache
+.claude/skills/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel

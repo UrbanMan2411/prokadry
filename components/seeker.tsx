@@ -156,7 +156,11 @@ export function MyResume() {
 }
 
 // ── Seeker Invitations ─────────────────────────────────────────────────────
-export function SeekerInvitations({ invitations }: { invitations: Invitation[] }) {
+export function SeekerInvitations({ invitations, setInvitations }: { invitations: Invitation[]; setInvitations: React.Dispatch<React.SetStateAction<Invitation[]>> }) {
+  const respond = (id: string, status: 'accepted' | 'rejected') => {
+    setInvitations(prev => prev.map(i => i.id === id ? { ...i, status } : i));
+  };
+
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto">
       <h1 className="text-xl font-bold text-slate-800 mb-5">Приглашения</h1>
@@ -181,8 +185,8 @@ export function SeekerInvitations({ invitations }: { invitations: Invitation[] }
                 </div>
                 {inv.status === 'sent' && (
                   <div className="flex gap-2 mt-3">
-                    <Btn size="sm" variant="primary">Принять</Btn>
-                    <Btn size="sm" variant="secondary">Отклонить</Btn>
+                    <Btn size="sm" variant="primary" onClick={() => respond(inv.id, 'accepted')}>Принять</Btn>
+                    <Btn size="sm" variant="secondary" onClick={() => respond(inv.id, 'rejected')}>Отклонить</Btn>
                   </div>
                 )}
               </div>
@@ -207,7 +211,7 @@ function buildSeekerThreads(messages: Message[]): Thread[] {
   }));
 }
 
-export function SeekerMessages({ messages }: { messages: Message[] }) {
+export function SeekerMessages({ messages, onMarkRead }: { messages: Message[]; onMarkRead?: (id: string) => void }) {
   const [threads, setThreads] = useState<Thread[]>(() => buildSeekerThreads(messages));
   const [activeId, setActiveId] = useState<string | null>(null);
   const [reply, setReply] = useState('');
@@ -237,7 +241,13 @@ export function SeekerMessages({ messages }: { messages: Message[] }) {
           <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
             {threads.map(t => (
               <button
-                key={t.id} onClick={() => setActiveId(t.id)}
+                key={t.id} onClick={() => {
+                  setActiveId(t.id);
+                  if (t.unread) {
+                    setThreads(prev => prev.map(th => th.id === t.id ? { ...th, unread: false } : th));
+                    onMarkRead?.(t.id);
+                  }
+                }}
                 className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition ${activeId === t.id ? 'bg-blue-50 border-l-2 border-blue-500' : ''}`}
               >
                 <div className="flex items-center gap-2 mb-0.5">

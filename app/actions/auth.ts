@@ -24,13 +24,17 @@ export async function signIn(
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) return { error: 'Неверный email или пароль' };
 
-  await db.user.update({
-    where: { id: user.id },
-    data: { lastLoginAt: new Date() },
-  });
+  try {
+    await db.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+  } catch (error) {
+    console.warn('[auth] lastLoginAt update skipped:', error);
+  }
 
   await createSession({ userId: user.id, email: user.email, role: user.role });
-  redirect('/');
+  redirect('/dashboard');
 }
 
 // ── Sign Up — Employer ───────────────────────────────────────────────────────
@@ -91,7 +95,7 @@ export async function signUpEmployer(
   });
 
   await createSession({ userId: user.id, email: user.email, role: 'EMPLOYER' });
-  redirect('/');
+  redirect('/dashboard');
 }
 
 // ── Sign Up — Seeker ─────────────────────────────────────────────────────────
@@ -152,7 +156,7 @@ export async function signUpSeeker(
   });
 
   await createSession({ userId: user.id, email: user.email, role: 'SEEKER' });
-  redirect('/');
+  redirect('/dashboard');
 }
 
 // ── Sign Out ─────────────────────────────────────────────────────────────────

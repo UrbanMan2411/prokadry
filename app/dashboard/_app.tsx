@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { Role } from '@/lib/types';
-import type { Resume, Vacancy, Employer } from '@/lib/types';
+import type { Resume, Vacancy, Employer, Message, Invitation } from '@/lib/types';
 import { RESUMES, VACANCIES, INVITATIONS, MESSAGES, EMPLOYERS, AUDIT_LOGS } from '@/lib/mock-data';
 import { AppShell } from '@/components/layout';
 import { ResumeRegistry } from '@/components/registry';
@@ -18,6 +18,7 @@ import {
   AdminDashboard, AdminResumes, AdminEmployers, AdminVacancies,
   AdminUsers, AdminDicts, AdminLogs,
 } from '@/components/admin';
+import { RegionList, RegionDetail } from '@/components/regions';
 
 const DEFAULT_PAGE: Record<Role, string> = {
   employer: 'dashboard',
@@ -31,10 +32,13 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
   const [resumes, setResumes] = useState<Resume[]>(RESUMES);
   const [vacancies, setVacancies] = useState<Vacancy[]>(VACANCIES);
   const [employers, setEmployers] = useState<Employer[]>(EMPLOYERS);
+  const [messages, setMessages] = useState<Message[]>(MESSAGES);
+  const [invitations, setInvitations] = useState<Invitation[]>(INVITATIONS);
   const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
   const [inviteTarget, setInviteTarget] = useState<Resume | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [registryPreset, setRegistryPreset] = useState<string>('');
+  const [selectedRegion, setSelectedRegion] = useState<string>('');
 
   const handleSetRole = (r: Role) => {
     setRole(r);
@@ -62,6 +66,21 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
     setPage('registry');
   };
 
+  const badges: Record<string, number> = {};
+  if (role === 'employer') {
+    badges['registry'] = resumes.filter(r => r.status === 'active').length;
+    badges['favorites'] = resumes.filter(r => r.isFavorite).length;
+    badges['messages'] = messages.filter(m => !m.isRead && m.fromRole === 'candidate').length;
+    badges['invitations'] = invitations.filter(i => i.status === 'sent').length;
+    badges['vacancies'] = vacancies.filter(v => v.status === 'active').length;
+  } else if (role === 'seeker') {
+    badges['seeker-invitations'] = invitations.filter(i => i.status === 'sent').length;
+    badges['seeker-messages'] = messages.filter(m => !m.isRead && m.fromRole === 'employer').length;
+  } else {
+    badges['admin-resumes'] = resumes.filter(r => r.status === 'pending').length;
+    badges['admin-employers'] = employers.filter(e => e.status === 'pending').length;
+  }
+
   const renderPage = () => {
     if (page === 'resume-detail' && selectedResume) {
       return (
@@ -74,12 +93,23 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
       );
     }
 
+    if (page === 'region-detail' && selectedRegion) {
+      return (
+        <RegionDetail
+          regionName={selectedRegion}
+          resumes={resumes}
+          vacancies={vacancies}
+          onBack={() => setPage('regions')}
+        />
+      );
+    }
+
     if (role === 'employer') {
       switch (page) {
         case 'dashboard':
           return (
             <EmployerDashboard
-              resumes={resumes} vacancies={vacancies} invitations={INVITATIONS}
+              resumes={resumes} vacancies={vacancies} invitations={invitations}
               onGoToRegistry={() => setPage('registry')}
               onGoToVacancies={() => setPage('vacancies')}
             />
@@ -113,24 +143,28 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
             />
           );
         case 'messages':
-          return <EmployerMessages messages={MESSAGES} />;
+          return <EmployerMessages messages={messages} onMarkRead={id => setMessages(prev => prev.map(m => m.id === id ? { ...m, isRead: true } : m))} />;
         case 'invitations':
-          return <EmployerInvitations invitations={INVITATIONS} />;
+          return <EmployerInvitations invitations={invitations} />;
         case 'company':
           return <CompanyProfile />;
+        case 'regions':
+          return (
+            <RegionList onOpenRegion={r => { setSelectedRegion(r); setPage('region-detail'); }} />
+          );
       }
     }
 
     if (role === 'seeker') {
       switch (page) {
         case 'seeker-dashboard':
-          return <SeekerDashboard invitations={INVITATIONS} messages={MESSAGES} />;
+          return <SeekerDashboard invitations={invitations} messages={messages} />;
         case 'my-resume':
           return <MyResume />;
         case 'seeker-invitations':
-          return <SeekerInvitations invitations={INVITATIONS} />;
+          return <SeekerInvitations invitations={invitations} setInvitations={setInvitations} />;
         case 'seeker-messages':
-          return <SeekerMessages messages={MESSAGES} />;
+          return <SeekerMessages messages={messages} onMarkRead={id => setMessages(prev => prev.map(m => m.id === id ? { ...m, isRead: true } : m))} />;
         case 'seeker-settings':
           return <SeekerSettings />;
       }
@@ -161,7 +195,7 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
   };
 
   return (
-    <AppShell role={role} email={email} page={page} setPage={setPage}>
+    <AppShell role={role} email={email} page={page} setPage={setPage} badges={badges}>
       <InviteModal
         open={inviteOpen}
         onClose={() => setInviteOpen(false)}

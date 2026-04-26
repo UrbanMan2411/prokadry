@@ -5,6 +5,7 @@ import type { Resume, Vacancy, Invitation, Message } from '@/lib/types';
 import { fmtSalary, fmtDate, fmtExp } from '@/lib/utils';
 import { Badge, Btn, Input, Select, Modal, Avatar, StarBtn, StatusBadge, StatCard, EmptyState } from './ui';
 import { InviteModal } from './resume';
+import { DICTIONARIES } from '@/lib/mock-data';
 
 // ── Employer Dashboard ─────────────────────────────────────────────────────
 export function EmployerDashboard({
@@ -353,6 +354,15 @@ export function EmployerVacancies({
 }
 
 // ── Favorites ──────────────────────────────────────────────────────────────
+const SPECIALIZATIONS = ['', '44-ФЗ', '223-ФЗ', 'Коммерческие закупки'];
+const SOCIAL_STATUSES = ['', 'Участник СВО', 'Член семьи участника СВО', 'Инвалид'];
+const SORT_OPTIONS = [
+  { value: 'date', label: 'По дате добавления' },
+  { value: 'salary', label: 'По зарплате (убыв.)' },
+  { value: 'experience', label: 'По опыту (убыв.)' },
+  { value: 'alpha', label: 'По алфавиту' },
+];
+
 export function EmployerFavorites({
   resumes, setResumes, onOpenResume, vacancies,
 }: {
@@ -361,18 +371,114 @@ export function EmployerFavorites({
 }) {
   const [invOpen, setInvOpen] = useState(false);
   const [selected, setSelected] = useState<Resume | null>(null);
-  const favs = resumes.filter(r => r.isFavorite);
+  const [position, setPosition] = useState('');
+  const [region, setRegion] = useState('');
+  const [expFrom, setExpFrom] = useState('');
+  const [expTo, setExpTo] = useState('');
+  const [salaryFrom, setSalaryFrom] = useState('');
+  const [salaryTo, setSalaryTo] = useState('');
+  const [specialization, setSpecialization] = useState('');
+  const [socialStatus, setSocialStatus] = useState('');
+  const [sort, setSort] = useState('date');
+
   const toggleFav = (id: string) => setResumes(prev => prev.map(r => r.id === id ? { ...r, isFavorite: !r.isFavorite } : r));
 
+  let favs = resumes.filter(r => r.isFavorite);
+  if (position) favs = favs.filter(r => r.position.toLowerCase().includes(position.toLowerCase()) || r.fullName.toLowerCase().includes(position.toLowerCase()));
+  if (region) favs = favs.filter(r => r.region === region || r.city === region);
+  if (expFrom) favs = favs.filter(r => r.experience >= parseInt(expFrom));
+  if (expTo) favs = favs.filter(r => r.experience <= parseInt(expTo));
+  if (salaryFrom) favs = favs.filter(r => r.salary !== null && r.salary >= parseInt(salaryFrom) * 1000);
+  if (salaryTo) favs = favs.filter(r => r.salary !== null && r.salary <= parseInt(salaryTo) * 1000);
+  if (specialization) favs = favs.filter(r => r.activityAreas.includes(specialization));
+  if (socialStatus) favs = favs.filter(r => r.specialStatuses.includes(socialStatus));
+
+  if (sort === 'salary') favs = [...favs].sort((a, b) => (b.salary ?? 0) - (a.salary ?? 0));
+  else if (sort === 'experience') favs = [...favs].sort((a, b) => b.experience - a.experience);
+  else if (sort === 'alpha') favs = [...favs].sort((a, b) => a.fullName.localeCompare(b.fullName, 'ru'));
+  else favs = [...favs].sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+
+  const isFiltered = !!(position || region || expFrom || expTo || salaryFrom || salaryTo || specialization || socialStatus);
+  const resetFilters = () => { setPosition(''); setRegion(''); setExpFrom(''); setExpTo(''); setSalaryFrom(''); setSalaryTo(''); setSpecialization(''); setSocialStatus(''); };
+
+  const totalFavs = resumes.filter(r => r.isFavorite).length;
+
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 max-w-6xl mx-auto">
       <InviteModal open={invOpen} onClose={() => setInvOpen(false)} resume={selected} vacancies={vacancies} />
-      <div className="mb-5">
-        <h1 className="text-xl font-bold text-slate-800">Избранное</h1>
-        <p className="text-sm text-slate-500 mt-0.5">{favs.length} кандидатов</p>
+
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-slate-800">Избранное</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            {isFiltered ? `${favs.length} из ${totalFavs} кандидатов` : `${totalFavs} кандидатов`}
+          </p>
+        </div>
       </div>
+
+      {/* Filter panel */}
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-5 space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="sm:col-span-2 lg:col-span-2">
+            <Input
+              value={position} onChange={setPosition} placeholder="Должность или ФИО..."
+              prefix={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>}
+            />
+          </div>
+          <Select
+            value={region} onChange={setRegion}
+            options={[{ value: '', label: 'Все регионы' }, ...DICTIONARIES.regions.map(r => ({ value: r, label: r }))]}
+          />
+          <Select
+            value={specialization} onChange={setSpecialization}
+            options={[{ value: '', label: 'Специализация' }, ...SPECIALIZATIONS.slice(1).map(s => ({ value: s, label: s }))]}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 items-end">
+          <div>
+            <label className="text-[10px] font-medium text-slate-500 mb-1 block">Опыт от (лет)</label>
+            <Input value={expFrom} onChange={setExpFrom} placeholder="0" type="number" />
+          </div>
+          <div>
+            <label className="text-[10px] font-medium text-slate-500 mb-1 block">до (лет)</label>
+            <Input value={expTo} onChange={setExpTo} placeholder="30" type="number" />
+          </div>
+          <div>
+            <label className="text-[10px] font-medium text-slate-500 mb-1 block">Зарплата от (тыс.)</label>
+            <Input value={salaryFrom} onChange={setSalaryFrom} placeholder="60" type="number" />
+          </div>
+          <div>
+            <label className="text-[10px] font-medium text-slate-500 mb-1 block">до (тыс.)</label>
+            <Input value={salaryTo} onChange={setSalaryTo} placeholder="300" type="number" />
+          </div>
+          <Select
+            value={socialStatus} onChange={setSocialStatus}
+            options={[{ value: '', label: 'Соц. статус' }, ...SOCIAL_STATUSES.slice(1).map(s => ({ value: s, label: s }))]}
+          />
+          <div className="flex gap-2">
+            <Select
+              value={sort} onChange={setSort}
+              options={SORT_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
+              className="flex-1"
+            />
+            {isFiltered && (
+              <button
+                onClick={resetFilters}
+                className="px-3 py-2 text-xs text-slate-500 hover:text-red-600 border border-slate-200 rounded-lg hover:border-red-200 transition whitespace-nowrap"
+                title="Сбросить фильтры"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
       {favs.length === 0 ? (
-        <EmptyState icon="⭐" title="Избранных нет" description="Добавляйте кандидатов в избранное прямо из реестра резюме" />
+        isFiltered
+          ? <EmptyState icon="🔍" title="Ничего не найдено" description="Попробуйте изменить параметры фильтрации" action={<Btn variant="secondary" onClick={resetFilters}>Сбросить фильтры</Btn>} />
+          : <EmptyState icon="⭐" title="Избранных нет" description="Добавляйте кандидатов в избранное прямо из реестра резюме" />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {favs.map(r => (
@@ -412,20 +518,43 @@ export function EmployerFavorites({
   );
 }
 
-// ── Messages — improved ────────────────────────────────────────────────────
-type ChatMsg = { id: string; fromMe: boolean; text: string; ts: string };
-type Thread = { id: string; name: string; msgs: ChatMsg[]; unread: boolean };
+// ── Messages — with contact exchange ──────────────────────────────────────
+type ChatMsg = { id: string; fromMe: boolean; text: string; ts: string; isSystem?: boolean };
+type ContactState = 'hidden' | 'requested' | 'opened';
+type Thread = {
+  id: string; name: string; msgs: ChatMsg[]; unread: boolean;
+  contactState: ContactState;
+  contactInfo: { phone: string; email: string; telegram: string };
+};
+
+function detectContactInText(text: string): 'phone' | 'email' | 'messenger' | 'link' | null {
+  if (/(\+7|8)[\s(]?\d{3}[\s)]?[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}/.test(text)) return 'phone';
+  if (/[\w.+-]+@[\w.-]+\.\w{2,}/.test(text)) return 'email';
+  if (/t\.me\/\w+|@[a-zA-Z]\w{3,}|telegram|whatsapp/i.test(text)) return 'messenger';
+  if (/https?:\/\/[^\s]+/.test(text)) return 'link';
+  return null;
+}
+
+const DETECTED_LABELS: Record<string, string> = {
+  phone: 'телефон', email: 'email', messenger: 'мессенджер', link: 'ссылка',
+};
 
 function buildThreads(messages: Message[]): Thread[] {
-  return messages.map(m => ({
+  return messages.map((m, i) => ({
     id: m.id,
     name: m.fromRole === 'candidate' ? m.fromName : m.toName,
     msgs: [{ id: m.id, fromMe: m.fromRole === 'employer', text: m.text, ts: m.createdAt }],
     unread: !m.isRead,
+    contactState: 'hidden' as ContactState,
+    contactInfo: {
+      phone: `+7 (9${String(i * 7 % 100).padStart(2, '0')}) ${300 + i * 13}-${10 + i * 3 % 90}-${20 + i % 79}`,
+      email: `candidate${i + 1}@mail.ru`,
+      telegram: `@specialist_${i + 1}`,
+    },
   }));
 }
 
-export function EmployerMessages({ messages }: { messages: Message[] }) {
+export function EmployerMessages({ messages, onMarkRead }: { messages: Message[]; onMarkRead?: (id: string) => void }) {
   const [threads, setThreads] = useState<Thread[]>(() => buildThreads(messages));
   const [activeId, setActiveId] = useState<string | null>(null);
   const [reply, setReply] = useState('');
@@ -448,7 +577,19 @@ export function EmployerMessages({ messages }: { messages: Message[] }) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   };
 
-  const lastMsg = (t: Thread) => t.msgs[t.msgs.length - 1];
+  const handleRequestContacts = () => {
+    if (!activeId) return;
+    const sysMsg: ChatMsg = { id: `sys-${Date.now()}`, fromMe: false, text: 'Работодатель запросил контактные данные.', ts: new Date().toISOString(), isSystem: true };
+    setThreads(prev => prev.map(t => t.id === activeId ? { ...t, contactState: 'requested', msgs: [...t.msgs, sysMsg] } : t));
+  };
+
+  const handleOpenContacts = () => {
+    if (!activeId) return;
+    const sysMsg: ChatMsg = { id: `sys-${Date.now()}`, fromMe: false, text: 'Кандидат поделился контактными данными.', ts: new Date().toISOString(), isSystem: true };
+    setThreads(prev => prev.map(t => t.id === activeId ? { ...t, contactState: 'opened', msgs: [...t.msgs, sysMsg] } : t));
+  };
+
+  const lastMsg = (t: Thread) => t.msgs.filter(m => !m.isSystem).at(-1) ?? t.msgs.at(-1)!;
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto">
@@ -465,12 +606,19 @@ export function EmployerMessages({ messages }: { messages: Message[] }) {
             <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
               {threads.map(t => (
                 <button
-                  key={t.id} onClick={() => setActiveId(t.id)}
+                  key={t.id} onClick={() => {
+                    setActiveId(t.id);
+                    if (t.unread) {
+                      setThreads(prev => prev.map(th => th.id === t.id ? { ...th, unread: false } : th));
+                      onMarkRead?.(t.id);
+                    }
+                  }}
                   className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors ${activeId === t.id ? 'bg-blue-50 border-l-2 border-blue-500' : ''}`}
                 >
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className={`font-semibold text-sm truncate flex-1 ${t.unread ? 'text-slate-900' : 'text-slate-700'}`}>{t.name}</span>
                     {t.unread && <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" />}
+                    {t.contactState === 'opened' && <span className="text-[10px] text-emerald-600 font-bold">📞</span>}
                   </div>
                   <div className="text-xs text-slate-400 truncate leading-relaxed">{lastMsg(t).text}</div>
                   <div className="text-[10px] text-slate-300 mt-1">{fmtDate(lastMsg(t).ts)}</div>
@@ -482,24 +630,77 @@ export function EmployerMessages({ messages }: { messages: Message[] }) {
           {/* Chat pane */}
           {active ? (
             <div className="flex-1 flex flex-col min-w-0">
+              {/* Header */}
               <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3 bg-slate-50/50">
                 <button onClick={() => setActiveId(null)} className="md:hidden p-1 -ml-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition" aria-label="Назад">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                 </button>
                 <Avatar name={active.name} size="sm" />
-                <div className="font-semibold text-slate-800 text-sm">{active.name}</div>
+                <div className="font-semibold text-slate-800 text-sm flex-1">{active.name}</div>
               </div>
-              <div className="flex-1 p-4 md:p-5 overflow-y-auto space-y-3">
-                {active.msgs.map(msg => (
-                  <div key={msg.id} className={`flex gap-3 ${msg.fromMe ? 'flex-row-reverse' : ''}`}>
-                    <Avatar name={msg.fromMe ? 'Я' : active.name} size="sm" />
-                    <div className={`max-w-[75%] md:max-w-sm rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${msg.fromMe ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
-                      {msg.text}
-                    </div>
+
+              {/* Contact exchange panel */}
+              <div className="px-4 py-2 border-b border-slate-100 bg-slate-50/40 flex items-center gap-2 min-h-[40px]">
+                {active.contactState === 'hidden' && (
+                  <button
+                    onClick={handleRequestContacts}
+                    className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium transition"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                    Запросить контактные данные
+                  </button>
+                )}
+                {active.contactState === 'requested' && (
+                  <div className="flex items-center justify-between w-full gap-2">
+                    <span className="text-xs text-slate-500 flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      Запрос контактов отправлен — ожидаем ответа
+                    </span>
+                    <button onClick={handleOpenContacts} className="text-[11px] text-emerald-600 hover:text-emerald-800 font-medium underline">
+                      [Принять — симуляция]
+                    </button>
                   </div>
-                ))}
+                )}
+                {active.contactState === 'opened' && (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-700">
+                    <span className="flex items-center gap-1 font-medium">
+                      <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                      {active.contactInfo.phone}
+                    </span>
+                    <span className="flex items-center gap-1">✉ {active.contactInfo.email}</span>
+                    <span className="flex items-center gap-1">✈ {active.contactInfo.telegram}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Messages */}
+              <div className="flex-1 p-4 md:p-5 overflow-y-auto space-y-2">
+                {active.msgs.map(msg => {
+                  const detected = !msg.isSystem && !msg.fromMe ? detectContactInText(msg.text) : null;
+                  return (
+                    <div key={msg.id}>
+                      {msg.isSystem ? (
+                        <div className="text-center text-xs text-slate-400 italic my-2 px-6">{msg.text}</div>
+                      ) : (
+                        <div className={`flex gap-3 ${msg.fromMe ? 'flex-row-reverse' : ''}`}>
+                          <Avatar name={msg.fromMe ? 'Я' : active.name} size="sm" />
+                          <div className={`max-w-[75%] md:max-w-sm rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${msg.fromMe ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                            {msg.text}
+                          </div>
+                        </div>
+                      )}
+                      {detected && (
+                        <div className="ml-11 mt-0.5 text-[10px] text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-1.5">
+                          ⚠ Обнаружен {DETECTED_LABELS[detected]} — используйте встроенный обмен контактами выше
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
                 <div ref={bottomRef} />
               </div>
+
+              {/* Input */}
               <div className="p-3 border-t border-slate-100 flex gap-2 items-end">
                 <textarea
                   value={reply} onChange={e => setReply(e.target.value)} onKeyDown={handleKeyDown}
@@ -524,15 +725,56 @@ export function EmployerMessages({ messages }: { messages: Message[] }) {
 }
 
 // ── Invitations ────────────────────────────────────────────────────────────
+type InvSortCol = 'candidateName' | 'vacancyTitle' | 'status' | 'createdAt' | null;
+type InvSortDir = 'asc' | 'desc';
+
+function InvSortIcon({ col, sortCol, sortDir }: { col: InvSortCol; sortCol: InvSortCol; sortDir: InvSortDir }) {
+  if (sortCol !== col) return <span className="ml-1 text-slate-300 text-xs">↕</span>;
+  return <span className="ml-1 text-blue-500 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>;
+}
+
 export function EmployerInvitations({ invitations }: { invitations: Invitation[] }) {
-  const [filter, setFilter] = useState('');
-  const displayed = filter ? invitations.filter(i => i.status === filter) : invitations;
+  const [statusFilter, setStatusFilter] = useState('');
+  const [candidateSearch, setCandidateSearch] = useState('');
+  const [sortCol, setSortCol] = useState<InvSortCol>(null);
+  const [sortDir, setSortDir] = useState<InvSortDir>('asc');
+  const [sortClickCount, setSortClickCount] = useState<Record<string, number>>({});
+
+  const handleSort = (col: InvSortCol) => {
+    if (!col) return;
+    const count = (sortClickCount[col] ?? 0) + 1;
+    setSortClickCount(prev => ({ ...prev, [col]: count % 3 }));
+    if (count % 3 === 0) { setSortCol(null); }
+    else if (count % 3 === 1) { setSortCol(col); setSortDir('asc'); }
+    else { setSortCol(col); setSortDir('desc'); }
+  };
+
+  let displayed = statusFilter ? invitations.filter(i => i.status === statusFilter) : invitations;
+  if (candidateSearch) displayed = displayed.filter(i => i.candidateName.toLowerCase().includes(candidateSearch.toLowerCase()));
+
+  if (sortCol) {
+    displayed = [...displayed].sort((a, b) => {
+      const av = a[sortCol] as string;
+      const bv = b[sortCol] as string;
+      const cmp = av.localeCompare(bv, 'ru');
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }
+
+  const SortHeader = ({ col, label }: { col: InvSortCol; label: string }) => (
+    <th
+      onClick={() => handleSort(col)}
+      className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide cursor-pointer hover:text-slate-700 select-none whitespace-nowrap"
+    >
+      {label}<InvSortIcon col={col} sortCol={sortCol} sortDir={sortDir} />
+    </th>
+  );
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto">
       <h1 className="text-xl font-bold text-slate-800 mb-5">Приглашения</h1>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         {[
           { label: 'Отправлено', status: 'sent', color: 'bg-blue-50 border-blue-200 text-blue-700' },
           { label: 'Просмотрено', status: 'viewed', color: 'bg-purple-50 border-purple-200 text-purple-700' },
@@ -541,8 +783,8 @@ export function EmployerInvitations({ invitations }: { invitations: Invitation[]
         ].map(s => (
           <button
             key={s.status}
-            onClick={() => setFilter(filter === s.status ? '' : s.status)}
-            className={`p-4 rounded-xl border-2 transition text-left ${filter === s.status ? s.color : 'bg-white border-slate-100 hover:border-slate-200'}`}
+            onClick={() => setStatusFilter(statusFilter === s.status ? '' : s.status)}
+            className={`p-4 rounded-xl border-2 transition text-left ${statusFilter === s.status ? s.color : 'bg-white border-slate-100 hover:border-slate-200'}`}
           >
             <div className="text-2xl font-bold">{invitations.filter(i => i.status === s.status).length}</div>
             <div className="text-xs mt-0.5">{s.label}</div>
@@ -550,53 +792,193 @@ export function EmployerInvitations({ invitations }: { invitations: Invitation[]
         ))}
       </div>
 
+      {/* Search + filter row */}
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <Input
+          value={candidateSearch} onChange={setCandidateSearch}
+          placeholder="Поиск по кандидату..."
+          prefix={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>}
+          className="flex-1 max-w-xs"
+        />
+        {(statusFilter || candidateSearch || sortCol) && (
+          <button
+            onClick={() => { setStatusFilter(''); setCandidateSearch(''); setSortCol(null); setSortClickCount({}); }}
+            className="px-3 py-2 text-xs text-slate-500 hover:text-red-600 border border-slate-200 rounded-lg hover:border-red-200 transition"
+          >
+            Сбросить всё
+          </button>
+        )}
+        <div className="text-xs text-slate-400 self-center ml-auto">
+          Показано: {displayed.length} из {invitations.length} · Клик по заголовку — сортировка (3 состояния)
+        </div>
+      </div>
+
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              {['Кандидат', 'Вакансия', 'Статус', 'Дата'].map(h => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {displayed.map(inv => (
-              <tr key={inv.id} className="hover:bg-slate-50 transition">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <Avatar name={inv.candidateName} size="sm" />
-                    <span className="font-medium text-slate-800">{inv.candidateName.split(' ').slice(0, 2).join(' ')}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-slate-600 text-xs">{inv.vacancyTitle}</td>
-                <td className="px-4 py-3"><StatusBadge status={inv.status} /></td>
-                <td className="px-4 py-3 text-slate-400 text-xs">{fmtDate(inv.createdAt)}</td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <SortHeader col="candidateName" label="Кандидат" />
+                <SortHeader col="vacancyTitle" label="Вакансия" />
+                <SortHeader col="status" label="Статус" />
+                <SortHeader col="createdAt" label="Дата" />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {displayed.map(inv => (
+                <tr key={inv.id} className="hover:bg-slate-50 transition">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <Avatar name={inv.candidateName} size="sm" />
+                      <span className="font-medium text-slate-800">{inv.candidateName.split(' ').slice(0, 2).join(' ')}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 text-xs max-w-[180px]">
+                    <div className="truncate">{inv.vacancyTitle}</div>
+                  </td>
+                  <td className="px-4 py-3"><StatusBadge status={inv.status} /></td>
+                  <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">{fmtDate(inv.createdAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         {displayed.length === 0 && (
-          <EmptyState icon="📨" title="Нет приглашений" description={filter ? 'Попробуйте снять фильтр' : 'Пригласите кандидатов из реестра'} />
+          <EmptyState icon="📨" title="Нет приглашений" description={statusFilter || candidateSearch ? 'Попробуйте изменить фильтры' : 'Пригласите кандидатов из реестра'} />
         )}
       </div>
     </div>
   );
 }
 
-// ── Company Profile ────────────────────────────────────────────────────────
+// ── Company Profile with INN autofill ─────────────────────────────────────
+type InnData = {
+  fullName: string; shortName: string; inn: string; kpp: string; ogrn: string;
+  legalAddress: string; region: string; okved: string; orgStatus: string;
+  head: string; registrationDate: string;
+};
+
+const INN_DB: Record<string, InnData> = {
+  '7700000001': {
+    fullName: 'Общество с ограниченной ответственностью «ТехноСервис»',
+    shortName: 'ООО «ТехноСервис»', inn: '7700000001', kpp: '770001001', ogrn: '1027700000001',
+    legalAddress: '109012, г. Москва, ул. Ленина, д. 1',
+    region: 'Москва', okved: '62.01 — Разработка компьютерного ПО',
+    orgStatus: 'Действующая', head: 'Иванов Алексей Петрович', registrationDate: '15.03.2001',
+  },
+  '7800000001': {
+    fullName: 'Акционерное общество «ГородСтрой»',
+    shortName: 'АО «ГородСтрой»', inn: '7800000001', kpp: '780001001', ogrn: '1047800000001',
+    legalAddress: '190000, г. Санкт-Петербург, Невский пр., д. 10',
+    region: 'Санкт-Петербург', okved: '41.20 — Строительство жилых и нежилых зданий',
+    orgStatus: 'Действующая', head: 'Смирнов Михаил Александрович', registrationDate: '22.07.2004',
+  },
+  '6600000001': {
+    fullName: 'Федеральное государственное унитарное предприятие «РосТех»',
+    shortName: 'ФГУП «РосТех»', inn: '6600000001', kpp: '660001001', ogrn: '1036600000001',
+    legalAddress: '620000, г. Екатеринбург, ул. Малышева, д. 100',
+    region: 'Свердловская область', okved: '25.40 — Производство оружия и боеприпасов',
+    orgStatus: 'Действующая', head: 'Кузнецов Сергей Дмитриевич', registrationDate: '08.11.2003',
+  },
+};
+
+type InnLookupState = 'idle' | 'loading' | 'found' | 'not_found' | 'invalid' | 'error';
+
+function validateINN(inn: string): boolean {
+  return /^\d{10}(\d{2})?$/.test(inn.trim());
+}
+
 export function CompanyProfile() {
   const [form, setForm] = useState({
-    name: 'ООО «ТехноСервис»', inn: '7700000001', region: 'Москва', city: 'Москва',
+    name: 'ООО «ТехноСервис»', inn: '7700000001', kpp: '770001001', ogrn: '1027700000001',
+    legalAddress: '109012, г. Москва, ул. Ленина, д. 1',
+    region: 'Москва', city: 'Москва', okved: '62.01 — Разработка компьютерного ПО',
+    orgStatus: 'Действующая', head: 'Иванов Алексей Петрович', registrationDate: '15.03.2001',
     contactName: 'Иванов Алексей Петрович', email: 'hr1@company1.ru',
     phone: '+7 (900) 300-10-20',
     description: 'Ведущая компания в сфере государственных закупок и тендерного сопровождения.',
   });
   const [saved, setSaved] = useState(false);
+  const [innLookupState, setInnLookupState] = useState<InnLookupState>('idle');
+  const [innResult, setInnResult] = useState<InnData | null>(null);
+
   const upd = (k: string, v: string) => { setForm(f => ({ ...f, [k]: v })); setSaved(false); };
+
+  const handleInnLookup = () => {
+    const inn = form.inn.trim();
+    if (!validateINN(inn)) { setInnLookupState('invalid'); setInnResult(null); return; }
+    setInnLookupState('loading');
+    setInnResult(null);
+    setTimeout(() => {
+      const found = INN_DB[inn];
+      if (found) { setInnResult(found); setInnLookupState('found'); }
+      else { setInnLookupState('not_found'); }
+    }, 800);
+  };
+
+  const handleFillProfile = () => {
+    if (!innResult) return;
+    setForm(f => ({
+      ...f,
+      name: innResult.shortName,
+      inn: innResult.inn, kpp: innResult.kpp, ogrn: innResult.ogrn,
+      legalAddress: innResult.legalAddress, region: innResult.region,
+      okved: innResult.okved, orgStatus: innResult.orgStatus,
+      head: innResult.head, registrationDate: innResult.registrationDate,
+    }));
+    setSaved(false);
+    setInnLookupState('idle');
+    setInnResult(null);
+  };
 
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto">
       <h1 className="text-xl font-bold text-slate-800 mb-5">Профиль компании</h1>
+
+      {/* INN lookup */}
+      <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-5">
+        <div className="text-sm font-semibold text-slate-700 mb-2">Заполнить по ИНН</div>
+        <div className="flex gap-2 mb-2">
+          <Input
+            value={form.inn} onChange={v => { upd('inn', v); setInnLookupState('idle'); setInnResult(null); }}
+            placeholder="10 или 12 цифр"
+            className="flex-1 max-w-xs"
+          />
+          <Btn variant="primary" onClick={handleInnLookup} disabled={innLookupState === 'loading'}>
+            {innLookupState === 'loading' ? 'Поиск…' : 'Найти по ИНН'}
+          </Btn>
+        </div>
+
+        {innLookupState === 'invalid' && (
+          <p className="text-xs text-red-600">ИНН должен содержать 10 или 12 цифр</p>
+        )}
+        {innLookupState === 'not_found' && (
+          <p className="text-xs text-amber-600">Организация по ИНН {form.inn} не найдена</p>
+        )}
+        {innLookupState === 'error' && (
+          <p className="text-xs text-red-600">Ошибка запроса. Попробуйте снова.</p>
+        )}
+        {innLookupState === 'found' && innResult && (
+          <div className="bg-white rounded-lg border border-blue-200 p-3 mt-1">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="font-semibold text-slate-800 text-sm">{innResult.shortName}</div>
+                <div className="text-xs text-slate-500 mt-0.5">{innResult.fullName}</div>
+                <div className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-slate-600">
+                  <span>КПП: {innResult.kpp}</span>
+                  <span>ОГРН: {innResult.ogrn}</span>
+                  <span>Регион: {innResult.region}</span>
+                  <span>Статус: {innResult.orgStatus}</span>
+                  <span className="col-span-2">Адрес: {innResult.legalAddress}</span>
+                  <span className="col-span-2">Руководитель: {innResult.head}</span>
+                </div>
+              </div>
+              <Btn variant="cyan" size="sm" onClick={handleFillProfile}>Заполнить профиль</Btn>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 md:p-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="col-span-2">
@@ -608,8 +990,32 @@ export function CompanyProfile() {
             <Input value={form.inn} onChange={v => upd('inn', v)} />
           </div>
           <div>
+            <label className="text-xs font-medium text-slate-600 mb-1 block">КПП</label>
+            <Input value={form.kpp} onChange={v => upd('kpp', v)} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-600 mb-1 block">ОГРН</label>
+            <Input value={form.ogrn} onChange={v => upd('ogrn', v)} />
+          </div>
+          <div>
             <label className="text-xs font-medium text-slate-600 mb-1 block">Регион</label>
             <Input value={form.region} onChange={v => upd('region', v)} />
+          </div>
+          <div className="col-span-2">
+            <label className="text-xs font-medium text-slate-600 mb-1 block">Юридический адрес</label>
+            <Input value={form.legalAddress} onChange={v => upd('legalAddress', v)} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-600 mb-1 block">ОКВЭД</label>
+            <Input value={form.okved} onChange={v => upd('okved', v)} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-600 mb-1 block">Статус организации</label>
+            <Input value={form.orgStatus} onChange={v => upd('orgStatus', v)} />
+          </div>
+          <div className="col-span-2">
+            <label className="text-xs font-medium text-slate-600 mb-1 block">Руководитель</label>
+            <Input value={form.head} onChange={v => upd('head', v)} />
           </div>
           <div>
             <label className="text-xs font-medium text-slate-600 mb-1 block">Контактное лицо</label>

@@ -11,7 +11,32 @@
       "Bash(npm run *)",
       "Bash(PORT=55999 npm run dev)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:55999)",
-      "mcp__Claude_in_Chrome__tabs_context_mcp"
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Read(//e/Claude/agzrt2/**)",
+      "Bash(ls -la \"agzrt start-handoff.zip\")",
+      "Bash(mkdir -p /tmp/agzrt-unzip)",
+      "Bash(unzip -q \"agzrt start-handoff.zip\" -d /tmp/agzrt-unzip)",
+      "Read(//tmp/**)",
+      "PowerShell($content = Get-Content \"/tmp/agzrt-unzip/agzrt-start/project/prokadry-landing.html\" -Raw -Encoding UTF8; $content.Length)",
+      "Bash(xargs grep *)",
+      "Bash(npx next *)",
+      "Bash(Start-Sleep -Seconds 5)",
+      "Bash(Get-Content \"C:\\\\Users\\\\danil\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\e--Claude-agzrt2-prokadry\\\\992f40e5-bd61-44ea-be90-8a617a731d39\\\\tasks\\\\bx3e8me45.output\" -Tail 20)",
+      "Bash(taskkill /PID 19480 /F)",
+      "Bash(node -e ' *)",
+      "Bash(claude plugin *)",
+      "Bash(python3 .claude/skills/ui-ux-pro-max/scripts/search.py \"HR platform government procurement SaaS professional Russia\" --design-system -p \"ПРОкадры\" -f markdown)",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"HR platform government procurement SaaS professional Russia\" --design-system -p \"ПРОкадры\" -f markdown)",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"auth form login signup conversion\" --domain ux)",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"form accessibility label error\" --domain ux)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)",
+      "Bash(curl -s http://localhost:3000/auth)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/)",
+      "Bash(curl -s -X POST http://localhost:3000/auth -H \"Content-Type: application/x-www-form-urlencoded\" --data \"email=&password=\" -o /dev/null -w \"%{http_code}\")",
+      "Bash(curl -s http://localhost:3000/)",
+      "Bash(curl -s http://localhost:3000/ -w \"\\\\nHTTP:%{http_code}\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/auth)",
+      "Bash(npx playwright *)"
     ]
   }
 }

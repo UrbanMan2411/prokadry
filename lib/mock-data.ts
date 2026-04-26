@@ -1,4 +1,4 @@
-import type { Resume, Employer, Vacancy, Invitation, Message, AdminStats, AuditLog, Dictionaries, WorkExperience } from './types';
+import type { Resume, Employer, Vacancy, Invitation, Message, AdminStats, AuditLog, Dictionaries, WorkExperience, ParsedSource, RegionStat } from './types';
 
 const _firstNames = ['Александр','Михаил','Сергей','Дмитрий','Андрей','Иван','Алексей','Николай','Артём','Владимир','Анна','Мария','Елена','Наталья','Ольга','Татьяна','Екатерина','Ирина','Светлана','Юлия','Евгений','Павел','Роман','Максим','Кирилл','Виктор','Денис','Антон','Станислав','Владислав','Ксения','Дарья','Валерия','Алина','Полина'];
 const _lastNames = ['Иванов','Смирнов','Кузнецов','Попов','Васильев','Петров','Соколов','Михайлов','Новиков','Федоров','Морозов','Волков','Алексеев','Лебедев','Семёнов','Егоров','Павлов','Козлов','Степанов','Николаев','Орлова','Зайцева','Борисова','Королёва','Соловьёва','Кириллова','Тихонова','Макарова','Беляева','Захарова'];
@@ -164,3 +164,74 @@ export const AUDIT_LOGS: AuditLog[] = Array.from({ length: 25 }, (_, i): AuditLo
   timestamp: new Date(Date.now() - i * 3600000).toISOString(),
   details: `ID объекта: ${['CV','EMP','VAC'][i % 3]}-${String(rndInt(1, 50, i * 47)).padStart(3, '0')}`,
 }));
+
+export const REGION_STATS: RegionStat[] = _regions.map((region, i) => {
+  const rvacs = VACANCIES.filter(v => v.region === region && v.status === 'active');
+  const rresumes = RESUMES.filter(r => r.region === region && r.status === 'active');
+  const salaried = rresumes.filter(r => r.salary);
+  const avgSalary = salaried.length > 0
+    ? Math.round(salaried.reduce((s, r) => s + (r.salary ?? 0), 0) / salaried.length)
+    : 65000 + rndInt(0, 35000, i * 71);
+  return {
+    name: _cities[i],
+    region,
+    vacanciesCount: rvacs.length,
+    resumesCount: rresumes.length,
+    avgSalary,
+    supplyDemandIndex: rresumes.length > 0
+      ? Math.round((rvacs.length / rresumes.length) * 100) / 100
+      : 0,
+    rating: rndInt(1, 10, i * 53),
+  };
+});
+
+export const PARSING_SOURCES: ParsedSource[] = [
+  {
+    id: 'PS-001', name: 'hh.ru — Вакансии', type: 'vacancies',
+    url: 'https://api.hh.ru/vacancies', status: 'active',
+    lastSyncAt: '2026-04-25T06:00:00Z', updateFrequency: 'каждые 2 часа',
+    legalNotes: 'Некоммерческое агрегирование по ToS hh.ru.',
+  },
+  {
+    id: 'PS-002', name: 'Работа.ру — Вакансии', type: 'vacancies',
+    url: 'https://api.rabota.ru/vacancies', status: 'active',
+    lastSyncAt: '2026-04-25T04:30:00Z', updateFrequency: 'каждые 3 часа',
+    legalNotes: 'Лицензионный договор № 2024/HR-001 с партнёрским API-ключом.',
+  },
+  {
+    id: 'PS-003', name: 'ЕИС Закупок — Тендеры', type: 'eis',
+    url: 'https://zakupki.gov.ru/epz/order/extendedsearch/results.html', status: 'active',
+    lastSyncAt: '2026-04-25T05:00:00Z', updateFrequency: 'ежедневно',
+    legalNotes: 'Открытые данные ЕИС. Постановление Правительства РФ № 1224.',
+  },
+  {
+    id: 'PS-004', name: 'Портал Работы России', type: 'regional_employment',
+    url: 'https://trudvsem.ru/vacancy/search', status: 'active',
+    lastSyncAt: '2026-04-24T18:00:00Z', updateFrequency: 'каждые 6 часов',
+    legalNotes: 'Открытые данные Минтруда РФ. Соглашение об информационном взаимодействии.',
+  },
+  {
+    id: 'PS-005', name: 'ФАС России — Реестр поставщиков', type: 'regulatory',
+    url: 'https://fas.gov.ru/registers', status: 'active',
+    lastSyncAt: '2026-04-24T12:00:00Z', updateFrequency: 'еженедельно',
+    legalNotes: 'Открытые данные ФАС. Федеральный закон № 135-ФЗ.',
+  },
+  {
+    id: 'PS-006', name: 'DaData — Обогащение данных', type: 'enrichment',
+    url: 'https://dadata.ru/api/', status: 'active',
+    lastSyncAt: '2026-04-25T07:00:00Z', updateFrequency: 'по запросу',
+    legalNotes: 'Коммерческий API. Данные ФНС и ФМС по лицензии DaData.',
+  },
+  {
+    id: 'PS-007', name: 'Росстат — Рынок труда', type: 'statistics',
+    url: 'https://rosstat.gov.ru/labour_market', status: 'active',
+    lastSyncAt: '2026-04-20T00:00:00Z', updateFrequency: 'ежемесячно',
+    legalNotes: 'Открытые статистические данные. Приказ Росстата № 415.',
+  },
+  {
+    id: 'PS-008', name: 'СФР — Социальная поддержка', type: 'social_support',
+    url: 'https://sfr.gov.ru/grazhdanam/lgoty', status: 'testing',
+    lastSyncAt: null, updateFrequency: 'ежеквартально',
+    legalNotes: 'В разработке. Соглашение с СФР на согласовании.',
+  },
+];
