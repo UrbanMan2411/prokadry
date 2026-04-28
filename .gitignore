@@ -42,6 +42,8 @@ yarn-error.log*
 *.png
 *.jpg
 *.jpeg
+# but keep the AI assistant avatar
+!public/robot.png
 
 # claude skills cache
 .claude/skills/

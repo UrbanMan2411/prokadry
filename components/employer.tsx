@@ -539,38 +539,78 @@ const DETECTED_LABELS: Record<string, string> = {
   phone: 'телефон', email: 'email', messenger: 'мессенджер', link: 'ссылка',
 };
 
+const AI_THREAD_ID = '__ai_assistant__';
+
+const AI_THREAD: Thread = {
+  id: AI_THREAD_ID,
+  name: 'ПРОкадры Ассистент',
+  msgs: [{ id: 'ai-0', fromMe: false, text: 'Здравствуйте! Я ИИ-ассистент ПРОкадры. Помогу найти специалистов по 44-ФЗ / 223-ФЗ или отвечу на вопросы о платформе.', ts: new Date().toISOString() }],
+  unread: false,
+  contactState: 'hidden',
+  contactInfo: { phone: '', email: '', telegram: '' },
+};
+
 function buildThreads(messages: Message[]): Thread[] {
-  return messages.map((m, i) => ({
-    id: m.id,
-    name: m.fromRole === 'candidate' ? m.fromName : m.toName,
-    msgs: [{ id: m.id, fromMe: m.fromRole === 'employer', text: m.text, ts: m.createdAt }],
-    unread: !m.isRead,
-    contactState: 'hidden' as ContactState,
-    contactInfo: {
-      phone: `+7 (9${String(i * 7 % 100).padStart(2, '0')}) ${300 + i * 13}-${10 + i * 3 % 90}-${20 + i % 79}`,
-      email: `candidate${i + 1}@mail.ru`,
-      telegram: `@specialist_${i + 1}`,
-    },
-  }));
+  return [
+    AI_THREAD,
+    ...messages.map((m, i) => ({
+      id: m.id,
+      name: m.fromRole === 'candidate' ? m.fromName : m.toName,
+      msgs: [{ id: m.id, fromMe: m.fromRole === 'employer', text: m.text, ts: m.createdAt }],
+      unread: !m.isRead,
+      contactState: 'hidden' as ContactState,
+      contactInfo: {
+        phone: `+7 (9${String(i * 7 % 100).padStart(2, '0')}) ${300 + i * 13}-${10 + i * 3 % 90}-${20 + i % 79}`,
+        email: `candidate${i + 1}@mail.ru`,
+        telegram: `@specialist_${i + 1}`,
+      },
+    })),
+  ];
 }
 
 export function EmployerMessages({ messages, onMarkRead }: { messages: Message[]; onMarkRead?: (id: string) => void }) {
   const [threads, setThreads] = useState<Thread[]>(() => buildThreads(messages));
   const [activeId, setActiveId] = useState<string | null>(null);
   const [reply, setReply] = useState('');
+  const [aiTyping, setAiTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const active = threads.find(t => t.id === activeId) ?? null;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [active?.msgs.length]);
+  }, [active?.msgs.length, aiTyping]);
 
-  const send = () => {
+  const send = async () => {
     if (!activeId || reply.trim().length < 2) return;
-    const msg: ChatMsg = { id: Date.now().toString(), fromMe: true, text: reply.trim(), ts: new Date().toISOString() };
+    const text = reply.trim();
+    const msg: ChatMsg = { id: Date.now().toString(), fromMe: true, text, ts: new Date().toISOString() };
     setThreads(prev => prev.map(t => t.id === activeId ? { ...t, msgs: [...t.msgs, msg], unread: false } : t));
     setReply('');
+
+    if (activeId === AI_THREAD_ID) {
+      setAiTyping(true);
+      try {
+        const currentMsgs = threads.find(t => t.id === AI_THREAD_ID)?.msgs ?? [];
+        const apiMessages = [...currentMsgs, msg].map(m => ({
+          role: m.fromMe ? 'user' : 'assistant',
+          content: m.text,
+        }));
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: apiMessages.slice(-10) }),
+        });
+        const data = await res.json();
+        const aiMsg: ChatMsg = { id: `ai-${Date.now()}`, fromMe: false, text: data.reply ?? 'Ошибка ответа.', ts: new Date().toISOString() };
+        setThreads(prev => prev.map(t => t.id === AI_THREAD_ID ? { ...t, msgs: [...t.msgs, aiMsg] } : t));
+      } catch {
+        const errMsg: ChatMsg = { id: `ai-err-${Date.now()}`, fromMe: false, text: 'Не удалось подключиться к ассистенту.', ts: new Date().toISOString() };
+        setThreads(prev => prev.map(t => t.id === AI_THREAD_ID ? { ...t, msgs: [...t.msgs, errMsg] } : t));
+      } finally {
+        setAiTyping(false);
+      }
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -610,15 +650,19 @@ export function EmployerMessages({ messages, onMarkRead }: { messages: Message[]
                     setActiveId(t.id);
                     if (t.unread) {
                       setThreads(prev => prev.map(th => th.id === t.id ? { ...th, unread: false } : th));
-                      onMarkRead?.(t.id);
+                      if (t.id !== AI_THREAD_ID) onMarkRead?.(t.id);
                     }
                   }}
                   className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors ${activeId === t.id ? 'bg-blue-50 border-l-2 border-blue-500' : ''}`}
                 >
                   <div className="flex items-center gap-2 mb-0.5">
+                    {t.id === AI_THREAD_ID && (
+                      <img src="/robot.png" alt="AI" className="w-6 h-6 rounded-full object-contain flex-shrink-0" />
+                    )}
                     <span className={`font-semibold text-sm truncate flex-1 ${t.unread ? 'text-slate-900' : 'text-slate-700'}`}>{t.name}</span>
-                    {t.unread && <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" />}
-                    {t.contactState === 'opened' && <span className="text-[10px] text-emerald-600 font-bold">📞</span>}
+                    {t.id === AI_THREAD_ID && <span className="text-[10px] font-bold px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded-full flex-shrink-0">AI</span>}
+                    {t.unread && t.id !== AI_THREAD_ID && <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" />}
+                    {t.contactState === 'opened' && t.id !== AI_THREAD_ID && <span className="text-[10px] text-emerald-600 font-bold">📞</span>}
                   </div>
                   <div className="text-xs text-slate-400 truncate leading-relaxed">{lastMsg(t).text}</div>
                   <div className="text-[10px] text-slate-300 mt-1">{fmtDate(lastMsg(t).ts)}</div>
@@ -631,15 +675,27 @@ export function EmployerMessages({ messages, onMarkRead }: { messages: Message[]
           {active ? (
             <div className="flex-1 flex flex-col min-w-0">
               {/* Header */}
-              <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3 bg-slate-50/50">
-                <button onClick={() => setActiveId(null)} className="md:hidden p-1 -ml-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition" aria-label="Назад">
+              <div className={`px-4 py-3 border-b border-slate-100 flex items-center gap-3 ${active.id === AI_THREAD_ID ? 'bg-gradient-to-r from-blue-600 to-cyan-500' : 'bg-slate-50/50'}`}>
+                <button onClick={() => setActiveId(null)} className={`md:hidden p-1 -ml-1 rounded-lg transition ${active.id === AI_THREAD_ID ? 'text-white/70 hover:text-white hover:bg-white/10' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`} aria-label="Назад">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                 </button>
-                <Avatar name={active.name} size="sm" />
-                <div className="font-semibold text-slate-800 text-sm flex-1">{active.name}</div>
+                {active.id === AI_THREAD_ID
+                  ? <img src="/robot.png" alt="AI" className="w-8 h-8 rounded-full object-contain flex-shrink-0" />
+                  : <Avatar name={active.name} size="sm" />
+                }
+                <div className="flex-1 min-w-0">
+                  <div className={`font-semibold text-sm ${active.id === AI_THREAD_ID ? 'text-white' : 'text-slate-800'}`}>{active.name}</div>
+                  {active.id === AI_THREAD_ID && (
+                    <div className="text-blue-100 text-[11px] flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
+                      онлайн
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Contact exchange panel */}
+              {/* Contact exchange panel — hidden for AI thread */}
+              {active.id !== AI_THREAD_ID && (
               <div className="px-4 py-2 border-b border-slate-100 bg-slate-50/40 flex items-center gap-2 min-h-[40px]">
                 {active.contactState === 'hidden' && (
                   <button
@@ -672,6 +728,7 @@ export function EmployerMessages({ messages, onMarkRead }: { messages: Message[]
                   </div>
                 )}
               </div>
+              )}
 
               {/* Messages */}
               <div className="flex-1 p-4 md:p-5 overflow-y-auto space-y-2">
@@ -683,13 +740,16 @@ export function EmployerMessages({ messages, onMarkRead }: { messages: Message[]
                         <div className="text-center text-xs text-slate-400 italic my-2 px-6">{msg.text}</div>
                       ) : (
                         <div className={`flex gap-3 ${msg.fromMe ? 'flex-row-reverse' : ''}`}>
-                          <Avatar name={msg.fromMe ? 'Я' : active.name} size="sm" />
+                          {active.id === AI_THREAD_ID && !msg.fromMe
+                            ? <img src="/robot.png" alt="AI" className="w-8 h-8 rounded-full object-contain flex-shrink-0 mt-0.5" />
+                            : <Avatar name={msg.fromMe ? 'Я' : active.name} size="sm" />
+                          }
                           <div className={`max-w-[75%] md:max-w-sm rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${msg.fromMe ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
                             {msg.text}
                           </div>
                         </div>
                       )}
-                      {detected && (
+                      {detected && active.id !== AI_THREAD_ID && (
                         <div className="ml-11 mt-0.5 text-[10px] text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-1.5">
                           ⚠ Обнаружен {DETECTED_LABELS[detected]} — используйте встроенный обмен контактами выше
                         </div>
@@ -697,6 +757,16 @@ export function EmployerMessages({ messages, onMarkRead }: { messages: Message[]
                     </div>
                   );
                 })}
+                {aiTyping && active.id === AI_THREAD_ID && (
+                  <div className="flex gap-3">
+                    <img src="/robot.png" alt="AI" className="w-8 h-8 rounded-full object-contain flex-shrink-0 mt-0.5" />
+                    <div className="bg-slate-100 rounded-2xl px-4 py-3 flex items-center gap-1">
+                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  </div>
+                )}
                 <div ref={bottomRef} />
               </div>
 
@@ -704,11 +774,12 @@ export function EmployerMessages({ messages, onMarkRead }: { messages: Message[]
               <div className="p-3 border-t border-slate-100 flex gap-2 items-end">
                 <textarea
                   value={reply} onChange={e => setReply(e.target.value)} onKeyDown={handleKeyDown}
-                  placeholder="Написать ответ… (Enter — отправить, Shift+Enter — перенос)"
+                  placeholder={active.id === AI_THREAD_ID ? 'Задать вопрос ассистенту…' : 'Написать ответ… (Enter — отправить, Shift+Enter — перенос)'}
                   rows={2}
                   className="flex-1 rounded-xl border border-slate-200 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  disabled={aiTyping && active.id === AI_THREAD_ID}
                 />
-                <Btn variant="primary" disabled={reply.trim().length < 2} onClick={send}
+                <Btn variant="primary" disabled={reply.trim().length < 2 || (aiTyping && active.id === AI_THREAD_ID)} onClick={send}
                   icon={<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>}
                 >
                   <span className="sr-only">Отправить</span>

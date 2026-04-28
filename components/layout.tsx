@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useRef, useEffect } from 'react';
 import type { Role } from '@/lib/types';
 import { signOut } from '@/app/actions/auth';
 
@@ -178,6 +178,160 @@ export function Header({
   );
 }
 
+type ChatMessage = { id: number; role: 'user' | 'ai'; text: string };
+
+function RobotIcon({ size = 36 }: { size?: number }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src="/robot.png" alt="AI ассистент" width={size} height={size} style={{ objectFit: 'contain' }} />
+  );
+}
+
+function AIChatWidget() {
+  const [open, setOpen] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { id: 0, role: 'ai', text: 'Здравствуйте! Я ИИ-ассистент ПРОкадры. Помогу найти специалистов по 44-ФЗ / 223-ФЗ или отвечу на вопросы о платформе.' },
+  ]);
+  const [input, setInput] = useState('');
+  const [typing, setTyping] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      setTimeout(() => inputRef.current?.focus(), 150);
+    }
+  }, [open, messages]);
+
+  async function send() {
+    const text = input.trim();
+    if (!text || typing) return;
+    const userMsg: ChatMessage = { id: Date.now(), role: 'user', text };
+    const next = [...messages, userMsg];
+    setMessages(next);
+    setInput('');
+    setTyping(true);
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: next
+            .filter(m => m.role !== 'ai' || m.id !== 0)
+            .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })),
+        }),
+      });
+      const data = await res.json();
+      setMessages(prev => [...prev, { id: Date.now() + 1, role: 'ai', text: data.reply ?? 'Ошибка ответа.' }]);
+    } catch {
+      setMessages(prev => [...prev, { id: Date.now() + 1, role: 'ai', text: 'Не удалось подключиться к ассистенту.' }]);
+    } finally {
+      setTyping(false);
+    }
+  }
+
+  return (
+    <>
+      {/* Chat window */}
+      <div
+        className={`fixed bottom-24 right-6 z-50 w-80 bg-white rounded-2xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden transition-all duration-300 ${open ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-4 pointer-events-none'}`}
+        style={{ height: 420 }}
+      >
+        {/* Header */}
+        <div className="flex items-center gap-2.5 px-4 py-3 bg-gradient-to-r from-blue-600 to-cyan-500 flex-shrink-0">
+          <RobotIcon size={32} />
+          <div className="flex-1 min-w-0">
+            <div className="text-white font-semibold text-sm leading-tight">ПРОкадры Ассистент</div>
+            <div className="text-blue-100 text-[11px] leading-tight flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
+              онлайн
+            </div>
+          </div>
+          <button
+            onClick={() => setOpen(false)}
+            className="p-1 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition flex-shrink-0"
+            aria-label="Закрыть"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5 bg-slate-50">
+          {messages.map(msg => (
+            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} gap-2`}>
+              {msg.role === 'ai' && (
+                <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 mt-0.5">
+                  <RobotIcon size={28} />
+                </div>
+              )}
+              <div
+                className={`max-w-[220px] px-3 py-2 rounded-2xl text-[13px] leading-snug ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-white text-slate-700 border border-slate-100 shadow-sm rounded-bl-sm'}`}
+              >
+                {msg.text}
+              </div>
+            </div>
+          ))}
+          {typing && (
+            <div className="flex justify-start gap-2">
+              <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 mt-0.5">
+                <RobotIcon size={28} />
+              </div>
+              <div className="bg-white border border-slate-100 shadow-sm rounded-2xl rounded-bl-sm px-3 py-2 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input */}
+        <div className="flex items-center gap-2 px-3 py-2.5 border-t border-slate-100 bg-white flex-shrink-0">
+          <input
+            ref={inputRef}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && send()}
+            placeholder="Напишите вопрос…"
+            className="flex-1 text-[13px] bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 placeholder:text-slate-400 transition"
+          />
+          <button
+            onClick={send}
+            disabled={!input.trim() || typing}
+            className="w-8 h-8 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 flex items-center justify-center text-white transition flex-shrink-0 cursor-pointer"
+            aria-label="Отправить"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Floating button */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="fixed bottom-6 right-6 z-50 w-16 h-16 rounded-full shadow-xl hover:shadow-2xl transition-all duration-200 hover:scale-105 cursor-pointer overflow-hidden border-2 border-white bg-white"
+        aria-label="Открыть ассистента"
+      >
+        <div className={`absolute inset-0 flex items-center justify-center transition-all duration-200 ${open ? 'opacity-0 scale-75' : 'opacity-100 scale-100'}`}>
+          <RobotIcon size={40} />
+        </div>
+        <div className={`absolute inset-0 flex items-center justify-center transition-all duration-200 ${open ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
+          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </button>
+    </>
+  );
+}
+
 export function AppShell({
   role, email, page, setPage, children, badges,
 }: {
@@ -192,6 +346,7 @@ export function AppShell({
         <Header role={role} email={email} onMenuClick={() => setSidebarOpen(true)} />
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
+      <AIChatWidget />
     </div>
   );
 }
