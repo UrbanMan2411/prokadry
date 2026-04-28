@@ -46,12 +46,15 @@ export async function POST(req: NextRequest) {
     }
 
     const client = new OpenAI({
-      baseURL: process.env.LLM_BASE_URL,
-      apiKey: process.env.LLM_API_KEY,
+      baseURL: process.env.LLM_BASE_URL?.trim(),
+      apiKey: process.env.LLM_API_KEY?.trim(),
     });
 
+    const model = (process.env.LLM_MODEL ?? 'anthropic/claude-sonnet-4.6').trim();
+    console.log('[chat API] model:', model, 'baseURL:', process.env.LLM_BASE_URL?.trim());
+
     const completion = await client.chat.completions.create({
-      model: process.env.LLM_MODEL ?? 'anthropic/claude-opus-4.6',
+      model,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         ...messages.slice(-10),
