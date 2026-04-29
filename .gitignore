@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files — keep local secrets out of git
 .env*
+!.env.example
 # but DO commit the demo database (seeded accounts)
 !dev.db
 
@@ -44,6 +45,11 @@ yarn-error.log*
 *.jpeg
 # but keep the AI assistant avatar
 !public/robot.png
+
+# generated presentation / local agent artifacts
+.agents/
+hyperframes-prokadry-presentation/
+ПРОкадры_*.html
 
 # claude skills cache
 .claude/skills/
