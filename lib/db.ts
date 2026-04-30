@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaLibSql } from '@prisma/adapter-libsql';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 function normalizeDatabaseUrl(value: string | undefined) {
   return (value ?? 'file:./dev.db').trim();
@@ -10,26 +11,24 @@ function normalizeDatabaseUrl(value: string | undefined) {
 function resolveWritableDatabaseUrl() {
   const dbUrl = normalizeDatabaseUrl(process.env.DATABASE_URL);
 
-  if (!dbUrl.startsWith('file:') || dbUrl.includes('/tmp/')) {
-    return dbUrl;
-  }
+  if (!dbUrl.startsWith('file:')) return dbUrl;
+
+  const tmpDb = path.join(os.tmpdir(), 'prokadry.db');
+  if (dbUrl.includes(tmpDb.replace(/\\/g, '/'))) return dbUrl;
 
   try {
-    const src = path.resolve(process.cwd(), dbUrl.replace('file:', '').replace('./', '').trim());
-    const dest = '/tmp/prokadry.db';
+    const src = path.resolve(process.cwd(), dbUrl.replace(/^file:/, '').replace(/^\.\//, ''));
 
     if (fs.existsSync(src)) {
-      if (!fs.existsSync(dest)) {
-        fs.copyFileSync(src, dest);
-        console.log('[db] Copied demo DB to /tmp/prokadry.db');
+      if (!fs.existsSync(tmpDb)) {
+        fs.copyFileSync(src, tmpDb);
+        console.log('[db] Copied demo DB to', tmpDb);
       }
-      return 'file:/tmp/prokadry.db';
+      return `file:${tmpDb}`;
     }
 
-    console.warn('[db] Source DB is missing, using configured DATABASE_URL as-is:', src);
     return dbUrl;
-  } catch (error) {
-    console.warn('[db] Falling back to configured DATABASE_URL:', error);
+  } catch {
     return dbUrl;
   }
 }

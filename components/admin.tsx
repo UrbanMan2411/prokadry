@@ -542,7 +542,7 @@ export function AdminImport() {
               <span className="w-3 h-3 rounded-full bg-green-500 inline-block" /> Avito
             </button>
           </div>
-          {source === 'hh' && !process.env.NEXT_PUBLIC_HH_CONFIGURED && (
+          {source === 'hh' && (
             <p className="text-xs text-amber-600 mt-2 bg-amber-50 rounded-lg px-3 py-2">
               Требуется <code className="font-mono">HH_EMPLOYER_TOKEN</code> в .env.local — токен аккаунта работодателя hh.ru
             </p>
