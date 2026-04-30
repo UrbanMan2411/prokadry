@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       apiKey: process.env.LLM_API_KEY?.trim(),
     });
 
-    const model = (process.env.LLM_MODEL ?? 'anthropic/claude-sonnet-4.6').trim();
+    const model = (process.env.LLM_MODEL ?? 'mimo/mimo-v2-pro').trim();
     console.log('[chat API] model:', model, 'baseURL:', process.env.LLM_BASE_URL?.trim());
 
     const completion = await client.chat.completions.create({

@@ -45,8 +45,8 @@ yarn-error.log*
 # but keep the AI assistant avatar
 !public/robot.png
 
-# claude skills cache
-.claude/skills/
+# local dev tools cache
+.claude/
 .agents/
 
 # typescript
