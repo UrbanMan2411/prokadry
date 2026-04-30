@@ -47,6 +47,7 @@ yarn-error.log*
 
 # claude skills cache
 .claude/skills/
+.agents/
 
 # typescript
 *.tsbuildinfo

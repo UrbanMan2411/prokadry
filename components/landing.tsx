@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useActionState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { type MapCity, RUSSIA_CITIES, useRussiaMap } from '@/lib/use2gis';
+import { signIn } from '@/app/actions/auth';
+import type { SignInState } from '@/app/actions/auth';
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);
@@ -256,9 +259,47 @@ function AIChatMockup() {
 
 // ── HEADER ───────────────────────────────────────────────────
 
+function QuickLoginForm({ onRegister, onClose }: { onRegister: () => void; onClose: () => void }) {
+  const [state, action, pending] = useActionState<SignInState, FormData>(signIn, undefined);
+  return (
+    <form action={action}>
+      <div style={{ fontWeight: 700, fontSize: 14, color: C.navy, marginBottom: 12 }}>Войти в аккаунт</div>
+      <input
+        name="email"
+        type="email"
+        placeholder="Email"
+        required
+        style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', fontFamily: 'Golos Text, sans-serif', marginBottom: 8, boxSizing: 'border-box', color: C.navy }}
+      />
+      <input
+        name="password"
+        type="password"
+        placeholder="Пароль"
+        required
+        style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', fontFamily: 'Golos Text, sans-serif', marginBottom: 8, boxSizing: 'border-box', color: C.navy }}
+      />
+      {state?.error && <div style={{ fontSize: 12, color: C.red, marginBottom: 8 }}>{state.error}</div>}
+      <button
+        type="submit"
+        disabled={pending}
+        style={{ width: '100%', background: pending ? C.slate : C.blue, color: 'white', border: 'none', borderRadius: 8, padding: '10px', fontSize: 13, fontWeight: 600, cursor: pending ? 'default' : 'pointer', fontFamily: 'Golos Text, sans-serif', marginBottom: 10 }}>
+        {pending ? 'Входим...' : 'Войти'}
+      </button>
+      <div style={{ textAlign: 'center', fontSize: 12, color: C.slate }}>
+        Нет аккаунта?{' '}
+        <button type="button" onClick={onRegister} style={{ background: 'none', border: 'none', color: C.blue, fontWeight: 600, cursor: 'pointer', fontSize: 12, fontFamily: 'Golos Text, sans-serif', padding: 0 }}>
+          Зарегистрироваться
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const router = useRouter();
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -309,8 +350,23 @@ function Header() {
 
         {/* Desktop auth */}
         {!isMobile && (
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-            <Link href="/auth" style={{ textDecoration: 'none' }}><Btn small>Войти</Btn></Link>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0, position: 'relative' }}>
+            {/* Quick login dropdown */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setLoginOpen(o => !o)}
+                style={{ padding: '8px 18px', borderRadius: 8, border: `1.5px solid ${C.border}`, background: loginOpen ? C.blueUltraLight : C.white, color: C.navy, fontFamily: 'Golos Text, sans-serif', fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all .15s', whiteSpace: 'nowrap' }}>
+                Войти
+              </button>
+              {loginOpen && (
+                <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: 280, background: C.white, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: '0 12px 40px rgba(15,23,42,.14)', padding: 16, zIndex: 200 }}>
+                  <QuickLoginForm
+                    onRegister={() => { setLoginOpen(false); router.push('/auth'); }}
+                    onClose={() => setLoginOpen(false)}
+                  />
+                </div>
+              )}
+            </div>
             <Link href="/auth" style={{ textDecoration: 'none' }}><Btn small primary>Зарегистрироваться</Btn></Link>
           </div>
         )}
@@ -361,89 +417,265 @@ function Header() {
 
 // ── HERO ─────────────────────────────────────────────────────
 
+const ROTATING_WORDS = ['по закупкам', 'по 44-ФЗ и 223-ФЗ', 'в тендерах', 'в госзакупках', 'по контрактной системе'];
+
 function Hero() {
   const isMobile = useIsMobile();
   const router = useRouter();
   const [query, setQuery] = useState('');
+  const [seekerQuery, setSeekerQuery] = useState('');
+  const [wordIdx, setWordIdx] = useState(0);
+  const [fade, setFade] = useState(true);
   const chips = ['Контрактный управляющий', 'Специалист по 44-ФЗ', 'Юрист по закупкам', 'Экономист', 'Тендерный специалист'];
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setFade(false);
+      setTimeout(() => { setWordIdx(i => (i + 1) % ROTATING_WORDS.length); setFade(true); }, 300);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, []);
+  const rotatingWord = ROTATING_WORDS[wordIdx];
+
   return (
-    <section style={{ background: C.white, padding: isMobile ? '48px 20px 0' : '72px 24px 0' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? 40 : 64, alignItems: 'center', minHeight: isMobile ? 'auto' : 520 }}>
-        <div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: C.blueUltraLight, border: `1px solid ${C.blueLighter}`, borderRadius: 20, padding: '5px 14px', fontSize: 12, color: C.blue, fontWeight: 600, marginBottom: 20, whiteSpace: 'nowrap' }}>
+    <section style={{ background: C.white, padding: isMobile ? '48px 20px 32px' : '72px 24px 48px' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+        {/* Badge */}
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: C.blueUltraLight, border: `1px solid ${C.blueLighter}`, borderRadius: 20, padding: '5px 14px', fontSize: 12, color: C.blue, fontWeight: 600 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', display: 'inline-block', opacity: 0.6 }}></span> HR-платформа для закупок
           </div>
-          <h1 style={{ fontSize: isMobile ? 32 : 48, fontWeight: 900, color: C.navy, lineHeight: 1.1, marginBottom: 20, letterSpacing: '-0.5px' }}>
-            Находите специалистов<br /><span style={{ color: C.blue }}>по закупкам</span> быстрее
-          </h1>
-          <p style={{ fontSize: 17, color: C.slate, lineHeight: 1.65, marginBottom: 32, maxWidth: 460 }}>
-            Платформа подбора кадров для сферы 44-ФЗ, 223-ФЗ и тендерного сопровождения. Умный поиск, AI-помощник, рабочие кабинеты для работодателей и соискателей.
-          </p>
-          {/* Search */}
-          <div style={{ background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: 6, display: 'flex', flexDirection: isMobile ? 'column' : 'row', marginBottom: 20, boxShadow: '0 2px 12px rgba(15,23,42,.06)', gap: isMobile ? 4 : 0 }}>
-            <input
-              value={query} onChange={e => setQuery(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && router.push('/dashboard')}
-              placeholder="Должность, навык или ключевое слово"
-              style={{ flex: 1, border: 'none', background: 'transparent', padding: '10px 14px', fontSize: 14, outline: 'none', color: C.navy, fontFamily: 'Golos Text, sans-serif', cursor: 'text' }}
-            />
-            {!isMobile && <div style={{ width: 1, background: C.border, margin: '8px 0' }}></div>}
-            {!isMobile && <input readOnly placeholder="Город / регион" style={{ width: 160, border: 'none', background: 'transparent', padding: '10px 14px', fontSize: 14, outline: 'none', color: C.navy, fontFamily: 'Golos Text, sans-serif', cursor: 'text' }} />}
-            <button onClick={() => router.push('/dashboard')} style={{ background: C.blue, color: 'white', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 14, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'Golos Text, sans-serif' }}>Найти</button>
+        </div>
+
+        {/* Main headline */}
+        <h1 style={{ textAlign: 'center', fontSize: isMobile ? 28 : 46, fontWeight: 900, color: C.navy, lineHeight: 1.1, marginBottom: 12, letterSpacing: '-0.5px' }}>
+          Работа в сфере закупок —<br />
+          <span
+            style={{ color: C.blue, display: 'inline-block', transition: 'opacity 0.3s', opacity: fade ? 1 : 0, minWidth: isMobile ? 200 : 380, textAlign: 'center' }}>
+            {rotatingWord}
+          </span>
+          {' '}быстрее
+        </h1>
+        <p style={{ textAlign: 'center', fontSize: 15, color: C.slate, lineHeight: 1.65, marginBottom: 40, maxWidth: 560, margin: '0 auto 40px' }}>
+          Специализированная HR-платформа для 44-ФЗ, 223-ФЗ и тендеров. Работодатели находят специалистов, соискатели — работу.
+        </p>
+
+        {/* Dual CTA cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 20, marginBottom: 40, maxWidth: 900, margin: '0 auto 40px' }}>
+          {/* Employer card */}
+          <div style={{ background: C.white, border: `2px solid ${C.blueLighter}`, borderRadius: 16, padding: '28px', boxShadow: '0 4px 24px rgba(30,64,175,.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: C.blueUltraLight, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <SvgIcon d={ICONS.building} size={20} color={C.blue} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 16, color: C.navy }}>Работодателям</div>
+                <div style={{ fontSize: 12, color: C.slate }}>Находите специалистов по закупкам</div>
+              </div>
+            </div>
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 6, display: 'flex', marginBottom: 16, gap: 4 }}>
+              <input
+                value={query} onChange={e => setQuery(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && router.push('/dashboard')}
+                placeholder="Должность или навык..."
+                style={{ flex: 1, border: 'none', background: 'transparent', padding: '8px 12px', fontSize: 13, outline: 'none', color: C.navy, fontFamily: 'Golos Text, sans-serif' }}
+              />
+              <button onClick={() => router.push('/dashboard')} style={{ background: C.blue, color: 'white', border: 'none', borderRadius: 7, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'Golos Text, sans-serif', whiteSpace: 'nowrap' }}>Найти</button>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+              {chips.map(c => <Chip key={c}>{c}</Chip>)}
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Link href="/auth" style={{ textDecoration: 'none', flex: 1 }}><button style={{ width: '100%', background: C.blue, color: 'white', border: 'none', borderRadius: 8, padding: '11px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'Golos Text, sans-serif' }}>Начать поиск</button></Link>
+              <Link href="/dashboard" style={{ textDecoration: 'none' }}><button style={{ background: 'transparent', color: C.navy, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '11px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'Golos Text, sans-serif', whiteSpace: 'nowrap' }}>Демо →</button></Link>
+            </div>
           </div>
-          {/* Chips */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 32 }}>
-            {chips.map(c => <Chip key={c}>{c}</Chip>)}
-          </div>
-          {/* CTAs */}
-          <div style={{ display: 'flex', gap: 12, alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row' }}>
-            <Link href="/auth" style={{ textDecoration: 'none' }}><Btn primary>Начать поиск</Btn></Link>
-            <Link href="/dashboard" style={{ textDecoration: 'none' }}><Btn>Посмотреть демо →</Btn></Link>
-          </div>
-          <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.green, display: 'inline-block', flexShrink: 0 }}></span>
-            <span style={{ fontSize: 13, color: C.slate }}>Бесплатная регистрация для соискателей · Тарифы для работодателей по запросу</span>
+
+          {/* Seeker card */}
+          <div style={{ background: C.white, border: '2px solid #A7F3D0', borderRadius: 16, padding: '28px', boxShadow: '0 4px 24px rgba(5,150,105,.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <SvgIcon d={ICONS.user} size={20} color={C.green} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 16, color: C.navy }}>Соискателям</div>
+                <div style={{ fontSize: 12, color: C.slate }}>Находите работу по закупкам</div>
+              </div>
+            </div>
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 6, display: 'flex', marginBottom: 16, gap: 4 }}>
+              <input
+                value={seekerQuery} onChange={e => setSeekerQuery(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && router.push('/auth')}
+                placeholder="Должность или специализация..."
+                style={{ flex: 1, border: 'none', background: 'transparent', padding: '8px 12px', fontSize: 13, outline: 'none', color: C.navy, fontFamily: 'Golos Text, sans-serif' }}
+              />
+              <button onClick={() => router.push('/auth')} style={{ background: C.green, color: 'white', border: 'none', borderRadius: 7, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'Golos Text, sans-serif', whiteSpace: 'nowrap' }}>Найти</button>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+              {['Специалист по закупкам', 'Контрактный управляющий', 'Тендерный менеджер'].map(c => (
+                <button key={c} type="button" style={{ display: 'inline-flex', alignItems: 'center', background: '#ECFDF5', color: C.green, border: '1px solid #A7F3D0', borderRadius: 20, padding: '4px 12px', fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', cursor: 'pointer', fontFamily: 'inherit' }}>{c}</button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Link href="/auth" style={{ textDecoration: 'none', flex: 1 }}><button style={{ width: '100%', background: C.green, color: 'white', border: 'none', borderRadius: 8, padding: '11px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'Golos Text, sans-serif' }}>Разместить резюме</button></Link>
+              <Link href="/auth" style={{ textDecoration: 'none' }}><button style={{ background: 'transparent', color: C.navy, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '11px 16px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'Golos Text, sans-serif', whiteSpace: 'nowrap' }}>Вакансии →</button></Link>
+            </div>
           </div>
         </div>
-        {/* Mockup right */}
-        {!isMobile && <div style={{ position: 'relative', height: 460 }}>
-          <div style={{ position: 'absolute', inset: 0 }}>
-            <MiniDashboard />
-          </div>
-          {/* Floating badge – AI result count */}
-          <div style={{ position: 'absolute', top: -16, right: 4, background: C.white, borderRadius: 10, padding: '8px 14px', boxShadow: '0 8px 24px rgba(15,23,42,.12)', border: `1px solid ${C.border}`, fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: C.blue, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><span style={{ color: 'white', fontWeight: 700, fontSize: 10 }}>AI</span></div>
-            <div><div style={{ fontWeight: 600, color: C.navy, fontSize: 11 }}>34 подходящих кандидата</div><div style={{ color: C.slate, fontSize: 10 }}>по результатам поиска</div></div>
-          </div>
-          <div style={{ position: 'absolute', bottom: 32, left: 0, background: C.white, borderRadius: 10, padding: '8px 14px', boxShadow: '0 8px 24px rgba(15,23,42,.12)', border: `1px solid ${C.border}`, fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.green, flexShrink: 0 }}></div>
-            <div style={{ fontWeight: 600, color: C.navy, fontSize: 11 }}>1 000+ резюме в базе</div>
-          </div>
-        </div>}
+
+        {/* Stats strip */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: isMobile ? 24 : 48, flexWrap: 'wrap' }}>
+          {[
+            { n: '1 000+', l: 'резюме в базе' },
+            { n: '100+', l: 'вакансий по закупкам' },
+            { n: '20', l: 'регионов России' },
+            { n: 'AI', l: 'умный поиск' },
+          ].map(s => (
+            <div key={s.n} style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: C.navy }}>{s.n}</div>
+              <div style={{ fontSize: 12, color: C.slate, marginTop: 2 }}>{s.l}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
 }
 
-// ── METRICS STRIP ────────────────────────────────────────────
+// ── BANNER CAROUSEL ──────────────────────────────────────────
 
-function MetricsStrip() {
-  const isMobile = useIsMobile();
-  const items = [
-    { n: '1 000+', l: 'резюме в специализированной базе' },
-    { n: '100+', l: 'вакансий по закупкам и тендерам' },
-    { n: '3', l: 'роли в системе: работодатель, соискатель, партнёр' },
-    { n: 'AI', l: 'поддержка подбора на каждом этапе' },
-  ];
+const BANNER_SLIDES = [
+  { bg: '#0F172A', accent: '#3B82F6', tag: 'Новое', title: 'Поиск по закупочной карте России', sub: 'Смотрите дефицит кадров по регионам — находите там, где нужны больше всего', cta: 'Смотреть карту', href: '/dashboard' },
+  { bg: '#1E3A5F', accent: '#10B981', tag: 'Для соискателей', title: 'Разместите резюме — вас найдут быстрее', sub: 'Более 100 работодателей ищут специалистов по 44-ФЗ и 223-ФЗ прямо сейчас', cta: 'Разместить резюме', href: '/auth' },
+  { bg: '#312E81', accent: '#F59E0B', tag: 'ИИ-поиск', title: 'Умный подбор за 5 минут', sub: 'Опишите задачу — ИИ-помощник подберёт кандидатов с нужной специализацией', cta: 'Попробовать', href: '/dashboard' },
+  { bg: '#134E4A', accent: '#60A5FA', tag: 'Для работодателей', title: 'Реестр резюме специалистов по закупкам', sub: 'Верифицированная база: контрактные управляющие, тендерные специалисты, юристы', cta: 'В реестр', href: '/dashboard' },
+];
+
+function BannerCarousel() {
+  const [idx, setIdx] = useState(0);
+  const [fade, setFade] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      setFade(false);
+      setTimeout(() => { setIdx(i => (i + 1) % BANNER_SLIDES.length); setFade(true); }, 250);
+    }, 4500);
+    return () => clearInterval(t);
+  }, []);
+
+  const slide = BANNER_SLIDES[idx];
+
   return (
-    <section style={{ background: C.white, borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}` }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '36px 20px', display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 0 }}>
-        {items.map((it, i) => (
-          <div key={it.n} style={{ textAlign: 'center', padding: '8px 24px', borderRight: isMobile ? (i % 2 === 0 ? `1px solid ${C.border}` : 'none') : (i < 3 ? `1px solid ${C.border}` : 'none'), borderBottom: isMobile && i < 2 ? `1px solid ${C.border}` : 'none', paddingBottom: isMobile && i < 2 ? 16 : 8, paddingTop: isMobile && i >= 2 ? 16 : 8 }}>
-            <div style={{ fontSize: 36, fontWeight: 900, color: C.blue, marginBottom: 6, letterSpacing: '-1px' }}>{it.n}</div>
-            <div style={{ fontSize: 13, color: C.slate, lineHeight: 1.4, maxWidth: 160, margin: '0 auto' }}>{it.l}</div>
+    <section style={{ background: slide.bg, transition: 'background 0.5s', overflow: 'hidden', position: 'relative' }}>
+      {/* Decorative circles */}
+      <div style={{ position: 'absolute', right: -60, top: -60, width: 260, height: 260, borderRadius: '50%', background: `${slide.accent}18`, pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', right: 80, bottom: -40, width: 140, height: 140, borderRadius: '50%', background: `${slide.accent}10`, pointerEvents: 'none' }} />
+
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, minHeight: 88, opacity: fade ? 1 : 0, transition: 'opacity 0.25s', position: 'relative' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1, minWidth: 0 }}>
+          <span style={{ background: slide.accent, color: '#fff', borderRadius: 20, padding: '3px 12px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>{slide.tag}</span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: '#fff', lineHeight: 1.2, marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{slide.title}</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{slide.sub}</div>
           </div>
-        ))}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
+          <button onClick={() => router.push(slide.href)} style={{ background: slide.accent, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'Golos Text, sans-serif', whiteSpace: 'nowrap' }}>{slide.cta} →</button>
+          {/* Dot indicators */}
+          <div style={{ display: 'flex', gap: 5 }}>
+            {BANNER_SLIDES.map((_, i) => (
+              <button key={i} onClick={() => { setFade(false); setTimeout(() => { setIdx(i); setFade(true); }, 150); }}
+                style={{ width: i === idx ? 18 : 6, height: 6, borderRadius: 3, background: i === idx ? slide.accent : 'rgba(255,255,255,0.3)', border: 'none', cursor: 'pointer', padding: 0, transition: 'all 0.3s' }} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── RUSSIA MAP SECTION ───────────────────────────────────────
+
+function RussiaMapSection() {
+  const isMobile = useIsMobile();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [selectedCity, setSelectedCity] = useState<MapCity | null>(null);
+  const maxVac = Math.max(...RUSSIA_CITIES.map(c => c.vacancies));
+
+  useRussiaMap({
+    containerRef,
+    cities: RUSSIA_CITIES,
+    center: [60, 60],
+    zoom: 3,
+    onCityClick: setSelectedCity,
+  });
+
+  return (
+    <section style={{ background: '#0F172A', padding: isMobile ? '48px 20px' : '72px 24px' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: 40 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 20, padding: '5px 14px', fontSize: 12, color: '#93C5FD', fontWeight: 600, marginBottom: 16 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }}></span> Карта рынка труда
+          </div>
+          <h2 style={{ fontSize: isMobile ? 22 : 34, fontWeight: 800, color: '#fff', marginBottom: 10, letterSpacing: '-0.5px' }}>
+            Специалисты по закупкам по всей России
+          </h2>
+          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', maxWidth: 500, margin: '0 auto' }}>
+            Более 20 регионов. Нажмите на пузырёк — узнайте данные по городу.
+          </p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 300px', gap: 32, alignItems: 'start' }}>
+          {/* 2GIS Map */}
+          <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', height: isMobile ? 320 : 480 }}>
+            <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+            {/* Selected city overlay */}
+            {selectedCity && (
+              <div style={{ position: 'absolute', top: 12, left: 12, background: '#1E293B', border: '1px solid #3B82F6', borderRadius: 10, padding: '10px 14px', zIndex: 10 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: '#fff', marginBottom: 4 }}>{selectedCity.name}</div>
+                <div style={{ fontSize: 12, color: '#93C5FD' }}>{selectedCity.vacancies} вакансий · {selectedCity.resumes} резюме</div>
+                <button onClick={() => setSelectedCity(null)} style={{ marginTop: 6, fontSize: 11, color: '#64748B', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'Golos Text, sans-serif' }}>закрыть ✕</button>
+              </div>
+            )}
+            <div style={{ position: 'absolute', bottom: 12, left: 12, background: 'rgba(15,23,42,0.75)', borderRadius: 6, padding: '4px 10px', fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
+              Размер пузырька = число вакансий
+            </div>
+          </div>
+
+          {/* Stats sidebar */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '16px 20px' }}>
+              <div style={{ fontSize: 28, fontWeight: 800, color: '#3B82F6', letterSpacing: '-1px' }}>1 000+</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>резюме в базе</div>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '16px 20px' }}>
+              <div style={{ fontSize: 28, fontWeight: 800, color: '#10B981', letterSpacing: '-1px' }}>100+</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>вакансий по закупкам</div>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '16px 20px' }}>
+              <div style={{ fontSize: 28, fontWeight: 800, color: '#F59E0B', letterSpacing: '-1px' }}>20+</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>регионов охвата</div>
+            </div>
+            {/* Top cities */}
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '16px 20px' }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>Топ городов</div>
+              {RUSSIA_CITIES.slice(0, 5).map((city, i) => (
+                <div key={city.name} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: i < 4 ? 8 : 0 }}>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', width: 14, textAlign: 'right', flexShrink: 0 }}>#{i + 1}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12, color: '#fff', fontWeight: 500 }}>{city.name}</div>
+                    <div style={{ height: 3, background: 'rgba(255,255,255,0.1)', borderRadius: 2, marginTop: 3, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${(city.vacancies / maxVac) * 100}%`, background: '#3B82F6', borderRadius: 2 }} />
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 11, color: '#93C5FD', flexShrink: 0 }}>{city.vacancies}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -989,8 +1221,8 @@ export default function LandingPage() {
       <Header />
       <main id="main-content">
         <Hero />
-        <MetricsStrip />
-        <SocialProof />
+        <BannerCarousel />
+        <RussiaMapSection />
         <ForWhom />
         <Features />
         <AITools />

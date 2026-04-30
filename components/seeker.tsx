@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import type { Invitation, Message } from '@/lib/types';
-import { fmtDate } from '@/lib/utils';
+import type { Invitation, Message, Vacancy } from '@/lib/types';
+import { fmtDate, fmtSalary } from '@/lib/utils';
 import { Badge, Btn, Input, Select, Avatar, StatusBadge, StatCard } from './ui';
 import { DICTIONARIES } from '@/lib/mock-data';
+import { RUSSIA_CITIES, useRussiaMap, type MapCity } from '@/lib/use2gis';
 
 // ── Seeker Dashboard ───────────────────────────────────────────────────────
 export function SeekerDashboard({ invitations, messages }: { invitations: Invitation[]; messages: Message[] }) {
@@ -81,28 +82,288 @@ export function SeekerDashboard({ invitations, messages }: { invitations: Invita
   );
 }
 
-// ── My Resume ──────────────────────────────────────────────────────────────
+// ── My Resume (multi-resume) ────────────────────────────────────────────────
+type ResumeForm = { id: string; position: string; city: string; salary: string; experience: string; education: string; workMode: string; about: string };
+
+const defaultResume = (id: string, position: string): ResumeForm => ({
+  id, position, city: 'Москва', salary: '90000', experience: '5',
+  education: 'Высшее', workMode: 'Офис',
+  about: 'Опытный специалист в сфере государственных и корпоративных закупок.',
+});
+
+type ImportedResume = {
+  source: 'hh' | 'avito';
+  sourceId: string;
+  position: string;
+  city: string;
+  salaryFrom: number | null;
+  experience: string;
+  education: string;
+  workMode: string;
+  skills: string[];
+  about: string;
+};
+
+type AvitoCard = { id: string; title: string; city: string; salary: string; url: string };
+
+function ResumeImportPanel({ onImport }: { onImport: (r: ImportedResume) => void }) {
+  const [open, setOpen] = useState<'hh' | 'avito' | null>(null);
+  const [hhStatus, setHhStatus] = useState<'idle' | 'loading' | 'connected' | 'error'>('idle');
+  const [hhList, setHhList] = useState<{ id: string; title: string; area: string }[]>([]);
+  const [avitoQuery, setAvitoQuery] = useState('специалист по закупкам');
+  const [avitoUrl, setAvitoUrl] = useState('');
+  const [avitoResults, setAvitoResults] = useState<AvitoCard[]>([]);
+  const [avitoLoading, setAvitoLoading] = useState(false);
+  const [avitoError, setAvitoError] = useState('');
+
+  // Check if hh.ru connected after OAuth redirect
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('hh_connected') === '1') {
+      setOpen('hh');
+      fetchHhList();
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  async function fetchHhList() {
+    setHhStatus('loading');
+    try {
+      const res = await fetch('/api/hh/resumes');
+      if (res.status === 401) { setHhStatus('idle'); return; }
+      const data = await res.json();
+      if (data.error) { setHhStatus('error'); return; }
+      setHhList(data);
+      setHhStatus('connected');
+    } catch {
+      setHhStatus('error');
+    }
+  }
+
+  async function importHhResume(id: string) {
+    const res = await fetch(`/api/hh/resumes?id=${id}`);
+    const data: ImportedResume = await res.json();
+    onImport(data);
+    setOpen(null);
+  }
+
+  async function searchAvito() {
+    setAvitoLoading(true);
+    setAvitoError('');
+    try {
+      const url = avitoUrl.trim()
+        ? `/api/avito/resumes?url=${encodeURIComponent(avitoUrl)}`
+        : `/api/avito/resumes?q=${encodeURIComponent(avitoQuery)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.error) { setAvitoError(data.error); return; }
+      if (avitoUrl.trim()) {
+        onImport(data as ImportedResume);
+        setOpen(null);
+      } else {
+        setAvitoResults(data as AvitoCard[]);
+      }
+    } catch (e: unknown) {
+      setAvitoError(e instanceof Error ? e.message : 'Ошибка');
+    } finally {
+      setAvitoLoading(false);
+    }
+  }
+
+  async function importAvitoByUrl(url: string) {
+    setAvitoLoading(true);
+    try {
+      const res = await fetch(`/api/avito/resumes?url=${encodeURIComponent(url)}`);
+      const data: ImportedResume = await res.json();
+      onImport(data);
+      setOpen(null);
+    } catch {
+      setAvitoError('Не удалось загрузить резюме');
+    } finally {
+      setAvitoLoading(false);
+    }
+  }
+
+  return (
+    <div className="bg-gradient-to-r from-blue-50 to-slate-50 border border-blue-100 rounded-xl p-4 mb-5">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <div className="text-sm font-semibold text-slate-800">Импорт резюме</div>
+          <div className="text-xs text-slate-500">Загрузите данные с job-портала автоматически</div>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setOpen(open === 'hh' ? null : 'hh'); if (open !== 'hh' && hhStatus === 'idle') fetchHhList(); }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 bg-white text-xs font-semibold text-red-700 hover:bg-red-50 transition">
+            <span className="text-base leading-none">🔴</span> hh.ru
+          </button>
+          <button
+            onClick={() => setOpen(open === 'avito' ? null : 'avito')}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-green-200 bg-white text-xs font-semibold text-green-700 hover:bg-green-50 transition">
+            <span className="text-base leading-none">🟢</span> Avito
+          </button>
+        </div>
+      </div>
+
+      {/* hh.ru panel */}
+      {open === 'hh' && (
+        <div className="mt-4 pt-4 border-t border-blue-100">
+          {hhStatus === 'idle' && (
+            <div className="text-center py-2">
+              <p className="text-sm text-slate-600 mb-3">Авторизуйтесь через hh.ru для импорта резюме</p>
+              <a href="/api/hh/auth"
+                className="inline-block px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition">
+                Войти через hh.ru
+              </a>
+            </div>
+          )}
+          {hhStatus === 'loading' && <div className="text-sm text-slate-500 text-center py-2">Загрузка резюме...</div>}
+          {hhStatus === 'error' && <div className="text-sm text-red-500 text-center py-2">Ошибка подключения к hh.ru</div>}
+          {hhStatus === 'connected' && (
+            <div className="space-y-2">
+              <div className="text-xs font-medium text-slate-600 mb-2">Ваши резюме на hh.ru:</div>
+              {hhList.length === 0 && <div className="text-sm text-slate-400">Резюме не найдены</div>}
+              {hhList.map(r => (
+                <div key={r.id} className="flex items-center justify-between px-3 py-2 bg-white rounded-lg border border-slate-100">
+                  <div>
+                    <div className="text-sm font-medium text-slate-800">{r.title}</div>
+                    <div className="text-xs text-slate-500">{r.area}</div>
+                  </div>
+                  <button onClick={() => importHhResume(r.id)}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition">
+                    Импортировать
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Avito panel */}
+      {open === 'avito' && (
+        <div className="mt-4 pt-4 border-t border-blue-100 space-y-3">
+          <div>
+            <div className="text-xs font-medium text-slate-600 mb-1">Поиск по ключевым словам</div>
+            <div className="flex gap-2">
+              <input
+                value={avitoQuery} onChange={e => setAvitoQuery(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && searchAvito()}
+                placeholder="специалист по закупкам"
+                className="flex-1 rounded-lg border border-slate-200 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-400"
+              />
+              <button onClick={searchAvito} disabled={avitoLoading}
+                className="px-3 py-2 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition disabled:opacity-60">
+                {avitoLoading ? '...' : 'Найти'}
+              </button>
+            </div>
+          </div>
+          <div>
+            <div className="text-xs font-medium text-slate-600 mb-1">Или вставьте ссылку на резюме</div>
+            <div className="flex gap-2">
+              <input
+                value={avitoUrl} onChange={e => setAvitoUrl(e.target.value)}
+                placeholder="https://www.avito.ru/..."
+                className="flex-1 rounded-lg border border-slate-200 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-400"
+              />
+              <button onClick={searchAvito} disabled={avitoLoading || !avitoUrl.trim()}
+                className="px-3 py-2 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition disabled:opacity-60">
+                Загрузить
+              </button>
+            </div>
+          </div>
+          {avitoError && <div className="text-xs text-red-500">{avitoError}</div>}
+          {avitoResults.length > 0 && (
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {avitoResults.map(r => (
+                <div key={r.id} className="flex items-center justify-between px-3 py-2 bg-white rounded-lg border border-slate-100">
+                  <div>
+                    <div className="text-sm font-medium text-slate-800">{r.title}</div>
+                    <div className="text-xs text-slate-500">{r.city} · {r.salary}</div>
+                  </div>
+                  <button onClick={() => importAvitoByUrl(r.url)}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 transition">
+                    Импорт
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function MyResume() {
-  const [form, setForm] = useState({
-    position: 'Специалист по закупкам',
-    city: 'Москва',
-    salary: '90000',
-    experience: '5',
-    education: 'Высшее',
-    workMode: 'Офис',
-    about: 'Опытный специалист в сфере государственных и корпоративных закупок. Отлично разбираюсь в законодательстве 44-ФЗ и 223-ФЗ.',
-  });
+  const [resumes, setResumes] = useState<ResumeForm[]>([
+    defaultResume('r1', 'Специалист по закупкам'),
+  ]);
+  const [active, setActive] = useState('r1');
   const [saved, setSaved] = useState(false);
-  const upd = (k: string, v: string) => { setForm(f => ({ ...f, [k]: v })); setSaved(false); };
+
+  const form = resumes.find(r => r.id === active)!;
+  const upd = (k: string, v: string) => {
+    setResumes(prev => prev.map(r => r.id === active ? { ...r, [k]: v } : r));
+    setSaved(false);
+  };
+  const addResume = () => {
+    const id = `r${Date.now()}`;
+    const newR = defaultResume(id, 'Новая специализация');
+    setResumes(prev => [...prev, newR]);
+    setActive(id);
+    setSaved(false);
+  };
+
+  const importResume = (r: ImportedResume) => {
+    const id = `r${Date.now()}`;
+    const workModeMap: Record<string, string> = { remote: 'remote', hybrid: 'hybrid', office: 'office' };
+    const eduMap: Record<string, string> = { higher: 'higher', secondary_special: 'secondary_special' };
+    const newR: ResumeForm = {
+      id,
+      position: r.position,
+      city: r.city,
+      salary: r.salaryFrom ? String(r.salaryFrom) : '',
+      experience: r.experience,
+      education: eduMap[r.education] ?? 'higher',
+      workMode: workModeMap[r.workMode] ?? 'office',
+      about: [r.about, r.skills.length ? `Навыки: ${r.skills.join(', ')}` : ''].filter(Boolean).join('\n\n'),
+    };
+    setResumes(prev => [...prev, newR]);
+    setActive(id);
+    setSaved(false);
+  };
+  const removeResume = (id: string) => {
+    if (resumes.length === 1) return;
+    setResumes(prev => prev.filter(r => r.id !== id));
+    setActive(resumes.find(r => r.id !== id)?.id ?? 'r1');
+  };
 
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-800">Моё резюме</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Редактируйте и обновляйте свои данные</p>
+          <h1 className="text-xl font-bold text-slate-800">Мои резюме</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Несколько резюме для разных специализаций</p>
         </div>
-        <Badge color="green">Активно</Badge>
+        <Btn variant="primary" size="sm" onClick={addResume}>+ Добавить резюме</Btn>
+      </div>
+
+      <ResumeImportPanel onImport={importResume} />
+
+      {/* Resume tabs */}
+      <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
+        {resumes.map(r => (
+          <div key={r.id} className={`flex items-center gap-1.5 flex-shrink-0 px-3 py-1.5 rounded-lg border text-sm cursor-pointer transition ${active === r.id ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}
+            onClick={() => setActive(r.id)}>
+            <span className="truncate max-w-[140px]">{r.position}</span>
+            {resumes.length > 1 && (
+              <button onClick={e => { e.stopPropagation(); removeResume(r.id); }}
+                className="text-slate-400 hover:text-red-500 transition ml-1 text-xs leading-none">×</button>
+            )}
+          </div>
+        ))}
       </div>
 
       <div className="space-y-5">
@@ -361,6 +622,162 @@ export function SeekerSettings() {
           <Btn variant="primary" onClick={() => setSaved(true)}>Сохранить</Btn>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Seeker Vacancy Registry ────────────────────────────────────────────────
+export function SeekerVacancyRegistry({ vacancies }: { vacancies: Vacancy[] }) {
+  const [search, setSearch] = useState('');
+  const [sphere, setSphere] = useState('');
+  const [activity, setActivity] = useState('');
+  const [workMode, setWorkMode] = useState('');
+
+  const active = vacancies.filter(v => v.status === 'active').filter(v => {
+    if (search && !v.title.toLowerCase().includes(search.toLowerCase()) &&
+        !v.employerName.toLowerCase().includes(search.toLowerCase()) &&
+        !v.city.toLowerCase().includes(search.toLowerCase())) return false;
+    if (sphere && !v.clientSpheres?.includes(sphere)) return false;
+    if (activity && !v.specialistActivities?.includes(activity)) return false;
+    if (workMode && v.workMode !== workMode) return false;
+    return true;
+  });
+
+  return (
+    <div className="p-4 md:p-6 max-w-5xl mx-auto">
+      <div className="mb-5">
+        <h1 className="text-xl font-bold text-slate-800">Реестр вакансий</h1>
+        <p className="text-sm text-slate-500 mt-0.5">{active.length} активных вакансий по закупкам</p>
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Должность, организация, город..."
+            className="col-span-1 sm:col-span-2 lg:col-span-1 rounded-lg border border-slate-200 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <select value={sphere} onChange={e => setSphere(e.target.value)}
+            className="rounded-lg border border-slate-200 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-600">
+            <option value="">Сфера заказчика</option>
+            {DICTIONARIES.clientSpheres.map(s => <option key={s}>{s}</option>)}
+          </select>
+          <select value={activity} onChange={e => setActivity(e.target.value)}
+            className="rounded-lg border border-slate-200 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-600">
+            <option value="">Вид деятельности</option>
+            {DICTIONARIES.specialistActivities.map(a => <option key={a}>{a}</option>)}
+          </select>
+          <select value={workMode} onChange={e => setWorkMode(e.target.value)}
+            className="rounded-lg border border-slate-200 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-600">
+            <option value="">Формат работы</option>
+            {DICTIONARIES.workModes.map(m => <option key={m}>{m}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {active.length === 0 && (
+          <div className="text-center py-16 text-slate-400">Вакансий не найдено</div>
+        )}
+        {active.map(v => (
+          <div key={v.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 hover:border-blue-200 transition">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-slate-800 text-base">{v.title}</div>
+                <div className="text-sm text-blue-600 mt-0.5">{v.employerName}</div>
+                <div className="text-xs text-slate-400 mt-0.5">{v.city} · {v.workMode}</div>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {v.clientSpheres?.map(s => (
+                    <span key={s} className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 text-xs border border-purple-100">{s}</span>
+                  ))}
+                  {v.specialistActivities?.slice(0, 3).map(a => (
+                    <span key={a} className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs border border-blue-100">{a}</span>
+                  ))}
+                  {v.skills.map(s => (
+                    <span key={s} className="px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 text-xs border border-slate-100">{s}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <div className="font-bold text-slate-800 text-sm whitespace-nowrap">{fmtSalary(v.salaryFrom)}</div>
+                <Btn variant="primary" size="sm" onClick={() => {}}>Откликнуться</Btn>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Seeker Map Search ──────────────────────────────────────────────────────
+export function SeekerMapSearch({ vacancies }: { vacancies: Vacancy[] }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [selectedCity, setSelectedCity] = useState<MapCity | null>(null);
+
+  const cityVacs = vacancies.filter(v => v.status === 'active').reduce<Record<string, number>>((acc, v) => {
+    acc[v.city] = (acc[v.city] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  // Merge real vacancy counts into RUSSIA_CITIES data
+  const cities = RUSSIA_CITIES.map(c => ({ ...c, vacancies: cityVacs[c.name] ?? c.vacancies }));
+
+  useRussiaMap({
+    containerRef,
+    cities,
+    center: [55, 57],
+    zoom: 4,
+    onCityClick: setSelectedCity,
+  });
+
+  const filtered = selectedCity
+    ? vacancies.filter(v => v.status === 'active' && v.city === selectedCity.name)
+    : [];
+
+  return (
+    <div className="p-4 md:p-6 max-w-5xl mx-auto">
+      <div className="mb-5">
+        <h1 className="text-xl font-bold text-slate-800">Поиск по карте</h1>
+        <p className="text-sm text-slate-500 mt-0.5">Нажмите на пузырёк города, чтобы увидеть вакансии</p>
+      </div>
+
+      {/* 2GIS Map */}
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden mb-4 relative" style={{ height: 420 }}>
+        <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+        {selectedCity && (
+          <div className="absolute top-3 left-3 bg-slate-800 text-white rounded-lg px-3 py-2 text-xs z-10 shadow-lg">
+            <span className="font-semibold">{selectedCity.name}</span>
+            <span className="text-slate-400 ml-2">{selectedCity.vacancies} вак.</span>
+            <button onClick={() => setSelectedCity(null)} className="ml-3 text-slate-400 hover:text-white">✕</button>
+          </div>
+        )}
+        <div className="absolute bottom-3 left-3 bg-slate-800/70 rounded px-2 py-1 text-xs text-slate-300">
+          Размер = число вакансий
+        </div>
+      </div>
+
+      {selectedCity && (
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-800">Вакансии: {selectedCity.name} ({filtered.length})</h2>
+            <button onClick={() => setSelectedCity(null)} className="text-xs text-slate-400 hover:text-slate-600">Закрыть</button>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {filtered.length === 0 && <div className="px-5 py-6 text-center text-sm text-slate-400">Нет активных вакансий</div>}
+            {filtered.map(v => (
+              <div key={v.id} className="px-5 py-3 flex items-center justify-between gap-4">
+                <div>
+                  <div className="font-medium text-slate-800 text-sm">{v.title}</div>
+                  <div className="text-xs text-slate-500">{v.employerName} · {v.workMode}</div>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <div className="text-sm font-semibold text-slate-700">{fmtSalary(v.salaryFrom)}</div>
+                  <Btn variant="primary" size="sm" onClick={() => {}}>Откликнуться</Btn>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

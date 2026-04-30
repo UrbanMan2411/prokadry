@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { Resume, Employer, Vacancy, AuditLog } from '@/lib/types';
-import { ADMIN_STATS, DICTIONARIES } from '@/lib/mock-data';
+import { ADMIN_STATS, DICTIONARIES, REGION_STATS } from '@/lib/mock-data';
 import { fmtDate, fmtDateTime, fmtSalary, fmtExp } from '@/lib/utils';
 import { Badge, Btn, Input, StatCard, StatusBadge, Avatar } from './ui';
 
@@ -14,6 +14,21 @@ export function AdminDashboard({ logs }: { logs: AuditLog[] }) {
       <div className="mb-6">
         <h1 className="text-xl font-bold text-slate-800">Панель администратора</h1>
         <p className="text-sm text-slate-500 mt-0.5">Обзор системы ПРОкадры</p>
+      </div>
+
+      {/* Татарстан интеграция */}
+      <div className="mb-6 flex items-start gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl">
+        <svg className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-blue-800">Интеграция: Портал Службы занятости РТ</p>
+          <p className="text-xs text-blue-600 mt-0.5">Синхронизация соискателей с tatartrud.ru запланирована. Текущий статус: настройка API.</p>
+        </div>
+        <a href="https://portal.tatartrud.ru/ER/JobApplicants" target="_blank" rel="noreferrer"
+          className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition whitespace-nowrap">
+          Открыть портал
+        </a>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -450,6 +465,251 @@ export function AdminLogs({ logs }: { logs: AuditLog[] }) {
                 <td className="px-4 py-3 text-slate-500 text-xs">{log.role}</td>
                 <td className="px-4 py-3 text-slate-400 text-xs font-mono">{log.details}</td>
                 <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">{fmtDateTime(log.timestamp)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Admin Import ───────────────────────────────────────────────────────────
+
+type ImportSummary = {
+  source: string; query: string; fetched: number;
+  created: number; skipped: number; errors: number;
+  results: { sourceId: string; status: string; resumeId?: string; reason?: string }[];
+};
+
+export function AdminImport() {
+  const [source, setSource] = useState<'hh' | 'avito'>('hh');
+  const [query, setQuery] = useState('специалист по закупкам');
+  const [limit, setLimit] = useState(20);
+  const [loading, setLoading] = useState(false);
+  const [summary, setSummary] = useState<ImportSummary | null>(null);
+  const [error, setError] = useState('');
+
+  const PROCUREMENT_QUERIES = [
+    'специалист по закупкам',
+    'контрактный управляющий',
+    'тендерный специалист',
+    'менеджер по закупкам 44-ФЗ',
+    'специалист по 223-ФЗ',
+    'юрист по закупкам',
+    'руководитель отдела закупок',
+  ];
+
+  async function runImport() {
+    setLoading(true);
+    setError('');
+    setSummary(null);
+    try {
+      const res = await fetch('/api/admin/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source, query, limit }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? 'Ошибка'); return; }
+      setSummary(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Сетевая ошибка');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="p-4 md:p-6 max-w-4xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-xl font-bold text-slate-800">Импорт резюме в базу</h1>
+        <p className="text-sm text-slate-500 mt-0.5">Наполнение базы данными с hh.ru и Avito.ru</p>
+      </div>
+
+      {/* Config */}
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 mb-5 space-y-4">
+        {/* Source */}
+        <div>
+          <label className="text-xs font-semibold text-slate-600 mb-2 block">Источник</label>
+          <div className="flex gap-3">
+            <button onClick={() => setSource('hh')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition ${source === 'hh' ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+              <span className="w-3 h-3 rounded-full bg-red-500 inline-block" /> hh.ru
+            </button>
+            <button onClick={() => setSource('avito')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition ${source === 'avito' ? 'border-green-400 bg-green-50 text-green-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+              <span className="w-3 h-3 rounded-full bg-green-500 inline-block" /> Avito
+            </button>
+          </div>
+          {source === 'hh' && !process.env.NEXT_PUBLIC_HH_CONFIGURED && (
+            <p className="text-xs text-amber-600 mt-2 bg-amber-50 rounded-lg px-3 py-2">
+              Требуется <code className="font-mono">HH_EMPLOYER_TOKEN</code> в .env.local — токен аккаунта работодателя hh.ru
+            </p>
+          )}
+        </div>
+
+        {/* Query presets */}
+        <div>
+          <label className="text-xs font-semibold text-slate-600 mb-2 block">Поисковый запрос</label>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {PROCUREMENT_QUERIES.map(q => (
+              <button key={q} onClick={() => setQuery(q)}
+                className={`text-xs px-2.5 py-1 rounded-full border transition ${query === q ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}>
+                {q}
+              </button>
+            ))}
+          </div>
+          <input value={query} onChange={e => setQuery(e.target.value)}
+            className="w-full rounded-lg border border-slate-200 text-sm px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Поисковый запрос..." />
+        </div>
+
+        {/* Limit */}
+        <div>
+          <label className="text-xs font-semibold text-slate-600 mb-2 block">
+            Количество резюме: <span className="text-blue-600">{limit}</span>
+          </label>
+          <input type="range" min={5} max={100} step={5} value={limit}
+            onChange={e => setLimit(Number(e.target.value))}
+            className="w-full accent-blue-600" />
+          <div className="flex justify-between text-xs text-slate-400 mt-1">
+            <span>5</span><span>50</span><span>100</span>
+          </div>
+        </div>
+
+        {error && <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
+
+        <button onClick={runImport} disabled={loading || !query.trim()}
+          className="w-full py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-60 flex items-center justify-center gap-2">
+          {loading ? (
+            <><span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" />Импортируем...</>
+          ) : `Запустить импорт (${source === 'hh' ? 'hh.ru' : 'Avito'})`}
+        </button>
+      </div>
+
+      {/* Results */}
+      {summary && (
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-sm font-bold text-slate-800">Результат:</span>
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">найдено: {summary.fetched}</span>
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-50 text-green-700">добавлено: {summary.created}</span>
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-50 text-slate-600">пропущено: {summary.skipped}</span>
+            {summary.errors > 0 && <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-600">ошибок: {summary.errors}</span>}
+          </div>
+          <div className="space-y-1.5 max-h-64 overflow-y-auto">
+            {summary.results.map((r, i) => (
+              <div key={i} className="flex items-center justify-between text-xs px-3 py-1.5 rounded-lg bg-slate-50">
+                <span className="font-mono text-slate-500">{r.sourceId}</span>
+                <span className={`font-medium ${r.status === 'created' ? 'text-green-600' : r.status === 'skipped' ? 'text-slate-400' : 'text-red-500'}`}>
+                  {r.status === 'created' ? '✓ добавлено' : r.status === 'skipped' ? '— дубликат' : `✕ ${r.reason?.slice(0, 40)}`}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Admin Regions (Кадровая карта) ─────────────────────────────────────────
+export function AdminRegions({ resumes, vacancies, onOpenRegion }: {
+  resumes: Resume[]; vacancies: Vacancy[];
+  onOpenRegion: (region: string) => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [emailTarget, setEmailTarget] = useState('');
+  const [emailSent, setEmailSent] = useState(false);
+
+  const stats = REGION_STATS.filter(r =>
+    !search || r.region.toLowerCase().includes(search.toLowerCase()) || r.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const totalResumes = resumes.filter(r => r.status === 'active').length;
+  const totalVacancies = vacancies.filter(v => v.status === 'active').length;
+  const deficitRegions = REGION_STATS.filter(r => r.supplyDemandIndex > 1).length;
+
+  return (
+    <div className="p-4 md:p-6 max-w-6xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-xl font-bold text-slate-800">Кадровая карта регионов</h1>
+        <p className="text-sm text-slate-500 mt-0.5">Статистика рынка труда специалистов по закупкам</p>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <StatCard label="Регионов" value={REGION_STATS.length} color="blue" icon={
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064" />
+          </svg>
+        } />
+        <StatCard label="Активных резюме" value={totalResumes} color="cyan" icon={
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+          </svg>
+        } />
+        <StatCard label="Активных вакансий" value={totalVacancies} color="green" icon={
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745" />
+          </svg>
+        } />
+        <StatCard label="Дефицит кадров" value={deficitRegions} color="amber" icon={
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        } />
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex items-center gap-3">
+        <svg className="w-5 h-5 text-slate-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+        <input value={emailTarget} onChange={e => setEmailTarget(e.target.value)}
+          placeholder="Email для рассылки статистики..."
+          className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <Btn variant="primary" size="sm" onClick={() => { if (emailTarget) { setEmailSent(true); setTimeout(() => setEmailSent(false), 3000); } }}>
+          {emailSent ? '✓ Отправлено' : 'Отправить отчёт'}
+        </Btn>
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm mb-4 p-4">
+        <Input value={search} onChange={setSearch} placeholder="Поиск региона..."
+          prefix={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>}
+        />
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-100">
+              {['Регион', 'Резюме', 'Вакансии', 'Статус', 'Ср. зарплата', ''].map(h => (
+                <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {stats.map(r => (
+              <tr key={r.region} className={`hover:bg-slate-50 transition ${r.region === 'Республика Татарстан' ? 'bg-blue-50/30' : ''}`}>
+                <td className="px-4 py-3">
+                  <div className="font-medium text-slate-800 flex items-center gap-1.5">
+                    {r.region === 'Республика Татарстан' && <span className="px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700 font-medium">РТ</span>}
+                    {r.region}
+                  </div>
+                  <div className="text-xs text-slate-400">{r.name}</div>
+                </td>
+                <td className="px-4 py-3 text-slate-700">{r.resumesCount}</td>
+                <td className="px-4 py-3 text-slate-700">{r.vacanciesCount}</td>
+                <td className="px-4 py-3">
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.supplyDemandIndex > 1 ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
+                    {r.supplyDemandIndex > 1 ? 'Дефицит' : 'Норма'}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-slate-700">{r.avgSalary.toLocaleString('ru')} ₽</td>
+                <td className="px-4 py-3">
+                  <button onClick={() => onOpenRegion(r.region)}
+                    className="text-xs text-blue-600 hover:text-blue-800 font-medium transition">Детали →</button>
+                </td>
               </tr>
             ))}
           </tbody>

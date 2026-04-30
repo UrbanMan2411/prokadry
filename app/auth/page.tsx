@@ -129,7 +129,7 @@ function SignInForm({ onSwitchTab }: { onSwitchTab: () => void }) {
 
 // ── Role selector ─────────────────────────────────────────────────────────────
 
-type SignUpRole = 'employer' | 'seeker';
+type SignUpRole = 'employer' | 'seeker' | 'region_map';
 
 function RoleCard({
   value, selected, onClick, title, description, icon,
@@ -177,11 +177,12 @@ function EmployerForm() {
   const [innResult, setInnResult] = useState<{ name: string; region: string; city: string } | null>(null);
   const [innFilled, setInnFilled] = useState(false);
 
-  const lookupInn = () => {
-    if (!/^\d{10}(\d{2})?$/.test(inn)) { setInnStatus('invalid'); return; }
+  const lookupInn = (val?: string) => {
+    const target = val ?? inn;
+    if (!/^\d{10}(\d{2})?$/.test(target)) { setInnStatus('invalid'); return; }
     setInnStatus('loading');
     setTimeout(() => {
-      const found = INN_DB[inn] ?? null;
+      const found = INN_DB[target] ?? null;
       setInnResult(found);
       setInnStatus(found ? 'found' : 'not_found');
     }, 800);
@@ -213,7 +214,11 @@ function EmployerForm() {
           <div className="flex gap-2">
             <input
               id="field-inn"
-              name="inn" value={inn} onChange={ev => { setInn(ev.target.value); setInnStatus('idle'); setInnFilled(false); }}
+              name="inn" value={inn} onChange={ev => {
+                const v = ev.target.value.replace(/\D/g, '').slice(0, 12);
+                setInn(v); setInnStatus('idle'); setInnFilled(false);
+                if (v.length === 10 || v.length === 12) lookupInn(v);
+              }}
               placeholder="7700000001" required
               autoComplete="off"
               aria-invalid={errs.inn ? true : undefined}
@@ -221,7 +226,7 @@ function EmployerForm() {
               className={`flex-1 rounded-lg border text-sm px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${errs.inn ? 'border-red-400 bg-red-50' : 'border-slate-200 bg-white'}`}
             />
             <button
-              type="button" onClick={lookupInn} disabled={innStatus === 'loading'}
+              type="button" onClick={() => lookupInn()} disabled={innStatus === 'loading'}
               className="px-3 py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-sm text-slate-700 font-medium transition disabled:opacity-60 whitespace-nowrap cursor-pointer"
             >
               {innStatus === 'loading' ? '...' : 'Найти'}
@@ -328,7 +333,7 @@ function SignUpForm({ onSwitchTab }: { onSwitchTab: () => void }) {
   const [role, setRole] = useState<SignUpRole>('employer');
   return (
     <div className="space-y-5">
-      <div className="flex gap-3" role="group" aria-label="Тип аккаунта">
+      <div className="grid grid-cols-3 gap-2" role="group" aria-label="Тип аккаунта">
         <RoleCard
           value="employer" selected={role === 'employer'} onClick={() => setRole('employer')}
           title="Работодатель" description="Ищу специалистов"
@@ -347,8 +352,23 @@ function SignUpForm({ onSwitchTab }: { onSwitchTab: () => void }) {
             </svg>
           }
         />
+        <RoleCard
+          value="region_map" selected={role === 'region_map'} onClick={() => setRole('region_map')}
+          title="Кадровая карта" description="Статистика региона"
+          icon={
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          }
+        />
       </div>
-      {role === 'employer' ? <EmployerForm /> : <SeekerForm />}
+      {role === 'region_map' && (
+        <div className="px-4 py-3 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-800 space-y-1">
+          <p className="font-semibold">Кадровая карта региона</p>
+          <p className="text-xs text-blue-600">Доступ к статистике рынка труда по муниципалитетам, дашбордам, выгрузке данных и рассылке отчётов. Для органов власти и региональных структур.</p>
+        </div>
+      )}
+      {role === 'employer' ? <EmployerForm /> : role === 'seeker' ? <SeekerForm /> : <EmployerForm />}
       <p className="text-center text-xs text-slate-500">
         Уже есть аккаунт?{' '}
         <button type="button" onClick={onSwitchTab} className="text-blue-600 font-medium hover:underline cursor-pointer">

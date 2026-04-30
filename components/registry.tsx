@@ -22,6 +22,8 @@ interface Filters {
   position: string;
   test: string;
   activityArea: string;
+  clientSphere: string;
+  specialistActivity: string;
   specialStatus: string;
   workMode: string;
   education: string;
@@ -36,7 +38,8 @@ interface Filters {
 }
 
 const EMPTY: Filters = {
-  region: '', position: '', test: '', activityArea: '', specialStatus: '',
+  region: '', position: '', test: '', activityArea: '', clientSphere: '',
+  specialistActivity: '', specialStatus: '',
   workMode: '', education: '', gender: '', salaryFrom: '', salaryTo: '',
   expMin: '', ageFrom: '', ageTo: '', onlyPhoto: false, onlyFavorites: false,
 };
@@ -222,6 +225,14 @@ function FilterSidebar({ filters, onChange, onReset, activeCount, open, onClose 
 
         <FilterSection title="Сфера деятельности">
           <CheckList groupName="filter-area" options={DICTIONARIES.activityAreas} value={filters.activityArea} onChange={v => onChange('activityArea', v)} />
+        </FilterSection>
+
+        <FilterSection title="Сфера заказчика">
+          <CheckList groupName="filter-sphere" options={DICTIONARIES.clientSpheres} value={filters.clientSphere} onChange={v => onChange('clientSphere', v)} />
+        </FilterSection>
+
+        <FilterSection title="Вид деятельности специалиста">
+          <CheckList groupName="filter-activity" options={DICTIONARIES.specialistActivities} value={filters.specialistActivity} onChange={v => onChange('specialistActivity', v)} />
         </FilterSection>
 
         <FilterSection title="Особый статус">
@@ -687,6 +698,7 @@ export function ResumeRegistry({
     if (filters.specialStatus && !r.specialStatuses.includes(filters.specialStatus)) return false;
     if (filters.test && !r.tests.includes(filters.test)) return false;
     if (filters.activityArea && !r.activityAreas.includes(filters.activityArea)) return false;
+    if (filters.specialistActivity && !r.activityAreas.includes(filters.specialistActivity)) return false;
     if (filters.salaryFrom && r.salary != null && r.salary < parseInt(filters.salaryFrom)) return false;
     if (filters.salaryTo && r.salary != null && r.salary > parseInt(filters.salaryTo)) return false;
     if (filters.expMin && r.experience < parseInt(filters.expMin)) return false;

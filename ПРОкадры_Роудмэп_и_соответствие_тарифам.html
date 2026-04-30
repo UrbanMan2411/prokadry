@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>ПРОкадры — Роудмэп и соответствие тарифам</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1e293b; background: #f8fafc; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 32px 24px 60px; }
+
+  /* Header */
+  .doc-header { background: #1e3a5f; color: white; border-radius: 12px; padding: 28px 32px; margin-bottom: 32px; }
+  .doc-header h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .doc-header .meta { font-size: 12px; color: #93c5fd; display: flex; gap: 24px; flex-wrap: wrap; }
+
+  /* Section headers */
+  h2 { font-size: 15px; font-weight: 700; color: #1e3a5f; margin: 32px 0 12px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0; display: flex; align-items: center; gap: 8px; }
+  h3 { font-size: 13px; font-weight: 700; color: #334155; margin: 20px 0 8px; }
+
+  /* Status chips */
+  .chip { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+  .done   { background: #dcfce7; color: #166534; }
+  .part   { background: #fef9c3; color: #854d0e; }
+  .todo   { background: #fee2e2; color: #991b1b; }
+  .ai     { background: #ede9fe; color: #5b21b6; }
+  .new    { background: #dbeafe; color: #1e40af; }
+
+  /* Compliance table */
+  .comp-table { width: 100%; border-collapse: collapse; margin: 0 0 8px; }
+  .comp-table th { background: #f1f5f9; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #64748b; padding: 8px 12px; text-align: left; border: 1px solid #e2e8f0; }
+  .comp-table td { padding: 9px 12px; border: 1px solid #e2e8f0; vertical-align: top; font-size: 12.5px; line-height: 1.5; }
+  .comp-table tr:nth-child(even) td { background: #f8fafc; }
+  .comp-table .blok { font-weight: 600; color: #1e3a5f; }
+
+  /* Roadmap */
+  .timeline { display: flex; flex-direction: column; gap: 0; }
+  .tday { display: flex; gap: 0; }
+  .tday-label { width: 110px; min-width: 110px; padding: 0 16px 0 0; text-align: right; }
+  .tday-date { font-size: 11px; font-weight: 700; color: #1e3a5f; }
+  .tday-dow  { font-size: 10px; color: #94a3b8; }
+  .tday-line { display: flex; flex-direction: column; align-items: center; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: #3b82f6; border: 2px solid white; box-shadow: 0 0 0 2px #3b82f6; margin-top: 3px; flex-shrink: 0; }
+  .dot.crit  { background: #ef4444; box-shadow: 0 0 0 2px #ef4444; }
+  .dot.done  { background: #22c55e; box-shadow: 0 0 0 2px #22c55e; }
+  .dot.warn  { background: #f59e0b; box-shadow: 0 0 0 2px #f59e0b; }
+  .vline { width: 2px; background: #e2e8f0; flex: 1; min-height: 8px; }
+  .tday-content { flex: 1; padding: 0 0 20px 16px; }
+  .tday-tasks { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+  .task { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; display: flex; align-items: flex-start; gap: 10px; }
+  .task.urgent { border-left: 3px solid #ef4444; }
+  .task.normal { border-left: 3px solid #3b82f6; }
+  .task.info   { border-left: 3px solid #22c55e; }
+  .task-ico { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+  .task-body { flex: 1; }
+  .task-title { font-weight: 600; color: #1e293b; font-size: 12.5px; }
+  .task-desc  { color: #64748b; font-size: 11.5px; margin-top: 2px; }
+
+  /* AI section */
+  .ai-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+  .ai-card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
+  .ai-card h4 { font-size: 12px; font-weight: 700; color: #5b21b6; margin-bottom: 4px; }
+  .ai-card p  { font-size: 11.5px; color: #64748b; line-height: 1.5; }
+
+  /* Summary box */
+  .summary { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px 24px; margin-top: 8px; }
+  .summary-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid #f1f5f9; font-size: 12.5px; }
+  .summary-row:last-child { border-bottom: none; }
+  .summary-row .label { color: #64748b; }
+  .summary-row .val   { font-weight: 700; color: #1e3a5f; }
+  .progress-bar { height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; margin-top: 12px; }
+  .progress-fill { height: 100%; border-radius: 3px; }
+
+  /* Note */
+  .note { background: #fef9c3; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #78350f; margin-top: 8px; }
+  .note strong { color: #92400e; }
+
+  @media print { body { background: white; } .wrap { padding: 16px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <div class="doc-header">
+    <h1>ПРОкадры — Роудмэп и соответствие тарифам</h1>
+    <div class="meta">
+      <span>Дата: 27 апреля 2026</span>
+      <span>Заказчик: АО «АГЗРТ»</span>
+      <span>Исполнитель: Волков В.А.</span>
+      <span>Дедлайн Этапа 1: 11 мая 2026</span>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════
+       БЛОК 1: Соответствие тарифу Стандарт
+  ═══════════════════════════════════════════════ -->
+  <h2>📋 Соответствие тарифу «Стандарт» (150 000 ₽)</h2>
+
+  <table class="comp-table">
+    <thead>
+      <tr>
+        <th style="width:26%">Блок работ</th>
+        <th style="width:36%">Что требуется по смете</th>
+        <th style="width:22%">Статус</th>
+        <th style="width:16%">Что сделано</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="blok">Проектная оболочка и роли</td>
+        <td>Навигация, оболочка сервиса, три роли: работодатель / соискатель / администратор</td>
+        <td><span class="chip done">✅ Готово</span></td>
+        <td>AppShell, маршрутизация, все роли реализованы</td>
+      </tr>
+      <tr>
+        <td class="blok">Реестр резюме, вакансии и карточки</td>
+        <td>Реестр с поиском и фильтрами, карточки кандидата и вакансии, сценарий приглашения</td>
+        <td><span class="chip done">✅ Готово</span></td>
+        <td>ResumeRegistry, ResumeDetail, InviteModal — всё есть</td>
+      </tr>
+      <tr>
+        <td class="blok">Демо-данные и расширенная база</td>
+        <td>Большая база резюме, вакансий, контактов для убедительной демонстрации</td>
+        <td><span class="chip done">✅ Готово</span></td>
+        <td>75 резюме, вакансии, компании, сообщения в mock-data.ts</td>
+      </tr>
+      <tr>
+        <td class="blok">Парсинг открытых данных</td>
+        <td>Сбор данных из открытых источников, нормализация, дедупликация</td>
+        <td><span class="chip todo">❌ Не сделано</span></td>
+        <td>Типы описаны в types.ts, скрипт сбора отсутствует</td>
+      </tr>
+      <tr>
+        <td class="blok">Кабинет работодателя</td>
+        <td>Реестр резюме, фильтры, избранное, приглашения, сообщения, сохранённые поиски</td>
+        <td><span class="chip done">✅ Готово</span></td>
+        <td>8 разделов: дашборд, реестр, вакансии, избранное, сообщения, приглашения, профиль компании, регионы</td>
+      </tr>
+      <tr>
+        <td class="blok">Кабинет соискателя</td>
+        <td>Профиль, резюме, входящие приглашения, сообщения, базовые настройки</td>
+        <td><span class="chip done">✅ Готово</span></td>
+        <td>5 разделов: дашборд, моё резюме, приглашения, сообщения, настройки</td>
+      </tr>
+      <tr>
+        <td class="blok">Админ-панель</td>
+        <td>Просмотр резюме, вакансий, пользователей, работодателей, справочников, журнал действий</td>
+        <td><span class="chip done">✅ Готово</span></td>
+        <td>7 разделов: дашборд, резюме, работодатели, вакансии, пользователи, справочники, логи</td>
+      </tr>
+      <tr>
+        <td class="blok">Видимость ИИ</td>
+        <td>Окно чат-бота в интерфейсе, демо-ответы, подсказки по работе с сервисом</td>
+        <td><span class="chip part">⚠️ Частично</span></td>
+        <td>API-роут /api/chat готов, системный промпт написан — виджет в UI не подключён</td>
+      </tr>
+      <tr>
+        <td class="blok">Авторизация и сессии</td>
+        <td>(входит в оболочку) вход, регистрация, роли</td>
+        <td><span class="chip done">✅ Готово</span></td>
+        <td>bcrypt, JWT-сессии, server actions, форма регистрации с ИНН-поиском</td>
+      </tr>
+      <tr>
+        <td class="blok">База данных (schema)</td>
+        <td>Рабочая БД для авторизации</td>
+        <td><span class="chip todo">❌ Не сделано</span></td>
+        <td>Prisma-клиент настроен, schema.prisma отсутствует</td>
+      </tr>
+      <tr>
+        <td class="blok">Публикация по ссылке</td>
+        <td>Готовая версия доступна по публичному URL (п. 1.3 договора)</td>
+        <td><span class="chip todo">❌ Не сделано</span></td>
+        <td>Деплой не выполнен, .env не настроен</td>
+      </tr>
+      <tr>
+        <td class="blok">Подготовка к показу</td>
+        <td>Сценарий демонстрации, проверка переходов</td>
+        <td><span class="chip todo">❌ Не сделано</span></td>
+        <td>Требует деплоя и тестового прогона</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="summary">
+    <div class="summary-row"><span class="label">Готово полностью</span><span class="val" style="color:#166534">7 блоков</span></div>
+    <div class="summary-row"><span class="label">Частично</span><span class="val" style="color:#92400e">1 блок (виджет ИИ)</span></div>
+    <div class="summary-row"><span class="label">Не сделано (критично до 11 мая)</span><span class="val" style="color:#991b1b">4 пункта</span></div>
+    <div class="summary-row"><span class="label">Готовность к сдаче Этапа 1</span><span class="val">~65%</span></div>
+    <div class="progress-bar"><div class="progress-fill" style="width:65%;background:#3b82f6;"></div></div>
+  </div>
+
+  <div class="note" style="margin-top:12px">
+    <strong>Главное до сдачи:</strong> schema.prisma + миграции → .env → деплой → подключить чат-виджет → парсинг (хотя бы минимальный, либо договориться о переносе в Этап 2).
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════
+       БЛОК 2: Что нужно до ИИ-ориентированного
+  ═══════════════════════════════════════════════ -->
+  <h2>🤖 Что нужно сделать до тарифа «ИИ-ориентированный» (250 000 ₽)</h2>
+  <p style="color:#64748b;font-size:12px;margin-bottom:16px">Всё из Стандарта плюс 8 новых ИИ-функций. Срок реализации по смете — до 01.06.2026.</p>
+
+  <div class="ai-grid">
+    <div class="ai-card">
+      <h4>💬 ИИ-чат по сайту</h4>
+      <p>Помощник в нижнем окне: объясняет разделы, статусы, сценарии работы с платформой. <br><strong style="color:#5b21b6">Фундамент готов</strong> — API-роут и промпт есть, нужен UI-виджет.</p>
+    </div>
+    <div class="ai-card">
+      <h4>🔍 ИИ-поиск резюме и вакансий</h4>
+      <p>Поиск на естественном языке: «найди юриста по 44-ФЗ в Татарстане с опытом от 3 лет». Подсказки релевантных кандидатов и вакансий.</p>
+    </div>
+    <div class="ai-card">
+      <h4>📄 ИИ-помощник для резюме</h4>
+      <p>Подсказки по улучшению резюме, формулировки опыта, краткое саммари кандидата, выделение сильных сторон.</p>
+    </div>
+    <div class="ai-card">
+      <h4>🏢 ИИ-помощник для работодателя</h4>
+      <p>Черновики приглашений, тексты сообщений кандидатам, описание вакансии, рекомендации по критериям отбора.</p>
+    </div>
+    <div class="ai-card">
+      <h4>📋 ИИ-помощник по документам</h4>
+      <p>Создание черновиков: сопроводительные письма, шаблоны вакансий, резюме, договорные формулировки, служебные шаблоны.</p>
+    </div>
+    <div class="ai-card">
+      <h4>🧩 ИИ-разбор карточек</h4>
+      <p>Краткая выжимка по кандидату: опыт, соответствие вакансии, риски, вопросы для собеседования.</p>
+    </div>
+    <div class="ai-card">
+      <h4>📩 ИИ-приглашение на платформу</h4>
+      <p>Система, которая приглашает специалиста с другого ресурса присоединиться к ПРОкадры.</p>
+    </div>
+    <div class="ai-card">
+      <h4>📊 Демо-аналитика</h4>
+      <p>Блоки «подходящие кандидаты», «слабые места вакансии», «кого пригласить первым» — интерактивные рекомендации.</p>
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:14px;background:#ede9fe;border-color:#c4b5fd;color:#4c1d95">
+    <strong>Технический задел уже есть:</strong> OpenAI-совместимый API-роут с системным промптом на русском языке подключён. Все 8 функций реализуются на его базе — нужны UI-компоненты и промпты под каждый сценарий. Дополнительная LLM-инфраструктура не требуется.
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════
+       БЛОК 3: Роудмэп до 12 мая
+  ═══════════════════════════════════════════════ -->
+  <h2>🗓 Роудмэп до 12 мая 2026</h2>
+  <p style="color:#64748b;font-size:12px;margin-bottom:20px">14 дней до дедлайна. Критический путь: база данных → деплой → чат-виджет → тестирование → сдача.</p>
+
+  <div class="timeline">
+
+    <!-- 27 апр -->
+    <div class="tday">
+      <div class="tday-label">
+        <div class="tday-date">27 апр</div>
+        <div class="tday-dow">сегодня, вс</div>
+      </div>
+      <div class="tday-line"><div class="dot done"></div><div class="vline"></div></div>
+      <div class="tday-content">
+        <div class="tday-tasks">
+          <div class="task info">
+            <div class="task-ico">✅</div>
+            <div class="task-body">
+              <div class="task-title">Анализ готовности завершён</div>
+              <div class="task-desc">Frontend ~90% готов. Открытые задачи зафиксированы. Договоры и смета изучены.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 28 апр -->
+    <div class="tday">
+      <div class="tday-label">
+        <div class="tday-date">28 апр</div>
+        <div class="tday-dow">пн</div>
+      </div>
+      <div class="tday-line"><div class="dot crit"></div><div class="vline"></div></div>
+      <div class="tday-content">
+        <div class="tday-tasks">
+          <div class="task urgent">
+            <div class="task-ico">🗄️</div>
+            <div class="task-body">
+              <div class="task-title">Создать schema.prisma</div>
+              <div class="task-desc">Таблицы: User, Employer, Resume, Vacancy, Invitation, Message. Запустить миграцию (prisma migrate dev).</div>
+            </div>
+          </div>
+          <div class="task urgent">
+            <div class="task-ico">⚙️</div>
+            <div class="task-body">
+              <div class="task-title">Настроить .env</div>
+              <div class="task-desc">DATABASE_URL, SESSION_SECRET, LLM_BASE_URL, LLM_API_KEY, LLM_MODEL — заполнить все переменные окружения.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 29-30 апр -->
+    <div class="tday">
+      <div class="tday-label">
+        <div class="tday-date">29–30 апр</div>
+        <div class="tday-dow">вт–ср</div>
+      </div>
+      <div class="tday-line"><div class="dot crit"></div><div class="vline"></div></div>
+      <div class="tday-content">
+        <div class="tday-tasks">
+          <div class="task urgent">
+            <div class="task-ico">🚀</div>
+            <div class="task-body">
+              <div class="task-title">Деплой на публичный URL</div>
+              <div class="task-desc">Vercel / Railway / VPS — выбрать платформу, развернуть приложение, проверить авторизацию на проде. Это требование договора п. 1.3.</div>
+            </div>
+          </div>
+          <div class="task normal">
+            <div class="task-ico">🔑</div>
+            <div class="task-body">
+              <div class="task-title">Проверить авторизацию end-to-end</div>
+              <div class="task-desc">Регистрация работодателя и соискателя, вход, редирект на дашборд, сессии.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1–2 мая -->
+    <div class="tday">
+      <div class="tday-label">
+        <div class="tday-date">1–2 мая</div>
+        <div class="tday-dow">чт–пт</div>
+      </div>
+      <div class="tday-line"><div class="dot"></div><div class="vline"></div></div>
+      <div class="tday-content">
+        <div class="tday-tasks">
+          <div class="task normal">
+            <div class="task-ico">💬</div>
+            <div class="task-body">
+              <div class="task-title">Подключить чат-виджет ИИ в UI</div>
+              <div class="task-desc">Плавающая кнопка + окно чата → вызов /api/chat. Промпт уже написан, роут работает. Это «видимость ИИ» из Стандарта.</div>
+            </div>
+          </div>
+          <div class="task normal">
+            <div class="task-ico">🔍</div>
+            <div class="task-body">
+              <div class="task-title">Подключить реальный поиск по ИНН</div>
+              <div class="task-desc">Заменить mock INN_DB на вызов API Dadata или ЕГРЮЛ. Сейчас в коде жёстко прописаны 3 компании.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3–5 мая -->
+    <div class="tday">
+      <div class="tday-label">
+        <div class="tday-date">3–5 мая</div>
+        <div class="tday-dow">сб–пн</div>
+      </div>
+      <div class="tday-line"><div class="dot"></div><div class="vline"></div></div>
+      <div class="tday-content">
+        <div class="tday-tasks">
+          <div class="task normal">
+            <div class="task-ico">🕸️</div>
+            <div class="task-body">
+              <div class="task-title">Парсинг открытых данных (минимальный)</div>
+              <div class="task-desc">Сбор хотя бы части данных из открытых источников (hh.ru открытые вакансии, ЕИС). Нормализация, загрузка в БД. Если источники закрыты — зафиксировать письменно и согласовать перенос в Этап 2.</div>
+            </div>
+          </div>
+          <div class="task normal">
+            <div class="task-ico">📊</div>
+            <div class="task-body">
+              <div class="task-title">Наполнить БД демо-данными</div>
+              <div class="task-desc">Перенести mock-data в реальную базу через seed-скрипт, чтобы кабинеты работали с настоящей БД, а не памятью браузера.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6–8 мая -->
+    <div class="tday">
+      <div class="tday-label">
+        <div class="tday-date">6–8 мая</div>
+        <div class="tday-dow">вт–чт</div>
+      </div>
+      <div class="tday-line"><div class="dot warn"></div><div class="vline"></div></div>
+      <div class="tday-content">
+        <div class="tday-tasks">
+          <div class="task normal">
+            <div class="task-ico">🧪</div>
+            <div class="task-body">
+              <div class="task-title">Полный тестовый прогон на проде</div>
+              <div class="task-desc">Проверить все сценарии: регистрация → поиск резюме → приглашение → сообщение → просмотр вакансии. Три роли. Фиксировать и устранять баги.</div>
+            </div>
+          </div>
+          <div class="task normal">
+            <div class="task-ico">📝</div>
+            <div class="task-body">
+              <div class="task-title">Сценарий демонстрации</div>
+              <div class="task-desc">Подготовить пошаговый сценарий показа для Заказчика: какой экран открываем первым, какой сценарий проходим, что демонстрирует каждый раздел.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 9–10 мая -->
+    <div class="tday">
+      <div class="tday-label">
+        <div class="tday-date">9–10 мая</div>
+        <div class="tday-dow">пт–сб (праздник)</div>
+      </div>
+      <div class="tday-line"><div class="dot warn"></div><div class="vline"></div></div>
+      <div class="tday-content">
+        <div class="tday-tasks">
+          <div class="task normal">
+            <div class="task-ico">🔧</div>
+            <div class="task-body">
+              <div class="task-title">Финальные правки и полировка</div>
+              <div class="task-desc">Устранение мелких UX-проблем, проверка мобильного вида, скорость загрузки, финальный commit.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 11 мая -->
+    <div class="tday">
+      <div class="tday-label">
+        <div class="tday-date">11 мая</div>
+        <div class="tday-dow" style="color:#ef4444;font-weight:700">ДЕДЛАЙН</div>
+      </div>
+      <div class="tday-line"><div class="dot crit"></div><div class="vline"></div></div>
+      <div class="tday-content">
+        <div class="tday-tasks">
+          <div class="task urgent">
+            <div class="task-ico">📤</div>
+            <div class="task-body">
+              <div class="task-title">Передача версии Заказчику</div>
+              <div class="task-desc">Отправка публичной ссылки + акт оказанных услуг. У Заказчика 5 рабочих дней на приёмку (п. 4.2 договора).</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 12 мая -->
+    <div class="tday">
+      <div class="tday-label">
+        <div class="tday-date">12 мая</div>
+        <div class="tday-dow">вс — буфер</div>
+      </div>
+      <div class="tday-line"><div class="dot info"></div><div class="vline"></div></div>
+      <div class="tday-content">
+        <div class="tday-tasks">
+          <div class="task info">
+            <div class="task-ico">🛡️</div>
+            <div class="task-body">
+              <div class="task-title">Резервный день</div>
+              <div class="task-desc">Буфер на устранение неожиданных проблем с деплоем, данными или замечаниями Заказчика. Обсуждение состава Этапа 2 и Приложения №1 к нему.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /timeline -->
+
+
+  <!-- ═══════════════════════════════════════════════
+       Итоговая сводка
+  ═══════════════════════════════════════════════ -->
+  <h2>📌 Итоговая сводка</h2>
+  <div class="summary">
+    <div class="summary-row">
+      <span class="label">Тариф Этапа 1 (договор)</span>
+      <span class="val">90 000 ₽ (60k предоплата + 30k после сдачи)</span>
+    </div>
+    <div class="summary-row">
+      <span class="label">Соответствие тарифу «Стандарт» (смета)</span>
+      <span class="val">150 000 ₽ — 65% выполнено</span>
+    </div>
+    <div class="summary-row">
+      <span class="label">Дедлайн Этапа 1</span>
+      <span class="val">11 мая 2026 (14 дней)</span>
+    </div>
+    <div class="summary-row">
+      <span class="label">Критические задачи до сдачи</span>
+      <span class="val" style="color:#991b1b">schema.prisma · .env · деплой · чат-виджет · парсинг</span>
+    </div>
+    <div class="summary-row">
+      <span class="label">Тариф «ИИ-ориентированный» (Этап 2)</span>
+      <span class="val">+100 000 ₽ (итого 250 000 ₽), срок до 01.06.2026</span>
+    </div>
+    <div class="summary-row">
+      <span class="label">Задел для ИИ-тарифа уже в коде</span>
+      <span class="val" style="color:#5b21b6">API-роут /api/chat + системный промпт готовы</span>
+    </div>
+  </div>
+
+  <div style="margin-top:24px;font-size:11px;color:#94a3b8;text-align:center">
+    ПРОкадры · АО «АГЗРТ» · Документ сформирован 27.04.2026
+  </div>
+
+</div>
+</body>
+</html>

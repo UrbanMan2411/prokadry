@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>ПРОкадры — Гайд по структуре</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1e293b; background: #f8fafc; }
+.wrap { max-width: 860px; margin: 0 auto; padding: 32px 24px 64px; }
+
+/* Header */
+.doc-header { background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%); color: white; border-radius: 14px; padding: 30px 36px; margin-bottom: 36px; }
+.doc-header h1 { font-size: 22px; font-weight: 800; margin-bottom: 6px; letter-spacing: -0.3px; }
+.doc-header p  { font-size: 13px; color: #93c5fd; }
+
+/* Section */
+h2 { font-size: 15px; font-weight: 800; color: #1e3a5f; margin: 36px 0 14px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0; }
+h3 { font-size: 12.5px; font-weight: 700; color: #334155; margin: 14px 0 6px; }
+
+/* Site map — page flow */
+.sitemap { display: flex; flex-direction: column; gap: 10px; }
+.sm-row { display: flex; gap: 10px; align-items: stretch; }
+.sm-page { flex: 1; background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; position: relative; }
+.sm-page .url  { font-size: 10px; font-weight: 700; color: #94a3b8; font-family: monospace; margin-bottom: 4px; }
+.sm-page .name { font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 3px; }
+.sm-page .desc { font-size: 11.5px; color: #64748b; line-height: 1.5; }
+.sm-page.accent { border-left: 4px solid #3b82f6; }
+.sm-page.green  { border-left: 4px solid #22c55e; }
+.sm-page.amber  { border-left: 4px solid #f59e0b; }
+.sm-page.purple { border-left: 4px solid #8b5cf6; }
+.sm-page.red    { border-left: 4px solid #ef4444; }
+
+.arrow { display: flex; align-items: center; justify-content: center; color: #cbd5e1; font-size: 18px; flex-shrink: 0; }
+
+/* Role tabs */
+.roles { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 4px; }
+.role-card { background: white; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
+.role-card .role-head { padding: 10px 14px 8px; font-size: 13px; font-weight: 700; }
+.role-card.employer .role-head { background: #dbeafe; color: #1e40af; }
+.role-card.seeker   .role-head { background: #dcfce7; color: #166534; }
+.role-card.admin    .role-head { background: #fef3c7; color: #92400e; }
+.role-card .role-items { padding: 10px 14px; display: flex; flex-direction: column; gap: 4px; }
+.role-item { font-size: 11.5px; color: #475569; display: flex; align-items: flex-start; gap: 6px; line-height: 1.4; }
+.role-item::before { content: '›'; color: #94a3b8; flex-shrink: 0; font-weight: 700; }
+
+/* Tech stack */
+.tech-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tech-card { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; }
+.tech-card .layer { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: #94a3b8; margin-bottom: 6px; }
+.tech-card .tech-name { font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 4px; }
+.tech-card .tech-desc { font-size: 11.5px; color: #64748b; line-height: 1.5; }
+.badge { display: inline-block; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 10.5px; font-weight: 600; color: #475569; padding: 1px 6px; margin: 2px 2px 0 0; font-family: monospace; }
+
+/* Data flow */
+.flow { display: flex; align-items: center; gap: 0; flex-wrap: wrap; margin: 8px 0 4px; }
+.flow-box { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; font-size: 12px; font-weight: 600; color: #1e293b; white-space: nowrap; }
+.flow-arr { padding: 0 6px; color: #94a3b8; font-size: 16px; }
+.flow-box.blue   { background: #dbeafe; border-color: #93c5fd; color: #1e40af; }
+.flow-box.green  { background: #dcfce7; border-color: #86efac; color: #166534; }
+.flow-box.purple { background: #ede9fe; border-color: #c4b5fd; color: #5b21b6; }
+.flow-box.slate  { background: #f1f5f9; border-color: #cbd5e1; color: #475569; }
+
+/* File tree */
+.tree { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px 20px; font-family: monospace; font-size: 12px; line-height: 2; }
+.tree .folder { color: #1e40af; font-weight: 700; }
+.tree .file   { color: #374151; }
+.tree .comment { color: #94a3b8; font-style: italic; font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; }
+.tree .indent1 { padding-left: 20px; }
+.tree .indent2 { padding-left: 40px; }
+.tree .indent3 { padding-left: 60px; }
+
+/* Note */
+.note { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #1e40af; margin-top: 10px; line-height: 1.6; }
+.note.green { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+.note.amber { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+
+/* Presentation tips */
+.tips { display: flex; flex-direction: column; gap: 8px; }
+.tip { display: flex; gap: 12px; background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; align-items: flex-start; }
+.tip-num { width: 24px; height: 24px; background: #1e3a5f; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; flex-shrink: 0; }
+.tip-body .title { font-size: 12.5px; font-weight: 700; color: #1e293b; margin-bottom: 2px; }
+.tip-body .desc  { font-size: 11.5px; color: #64748b; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="doc-header">
+    <h1>ПРОкадры — Структура сайта и кода</h1>
+    <p>Краткий гайд для презентации Заказчику · 27 апреля 2026</p>
+  </div>
+
+
+  <!-- ══════════════════════════
+       1. Карта сайта
+  ══════════════════════════ -->
+  <h2>🗺 Карта сайта — что видит пользователь</h2>
+
+  <div class="sitemap">
+
+    <div class="sm-row">
+      <div class="sm-page accent">
+        <div class="url">prokadry.ru /</div>
+        <div class="name">🏠 Главная страница (лендинг)</div>
+        <div class="desc">Описание платформы, цифры, кому подходит, призыв к регистрации. Виден всем без входа.</div>
+      </div>
+    </div>
+
+    <div class="sm-row" style="justify-content:center">
+      <div class="arrow">↓</div>
+    </div>
+
+    <div class="sm-row">
+      <div class="sm-page green">
+        <div class="url">prokadry.ru /auth</div>
+        <div class="name">🔐 Авторизация</div>
+        <div class="desc">Вход и регистрация. При регистрации выбирается роль: <strong>Работодатель</strong> (организация с ИНН) или <strong>Соискатель</strong> (специалист по закупкам).</div>
+      </div>
+    </div>
+
+    <div class="sm-row" style="justify-content:center">
+      <div class="arrow">↓ после входа</div>
+    </div>
+
+    <div class="sm-row">
+      <div class="sm-page amber">
+        <div class="url">prokadry.ru /dashboard</div>
+        <div class="name">📊 Личный кабинет</div>
+        <div class="desc">Главный рабочий экран. Разный для каждой роли — работодатель видит одни разделы, соискатель другие, администратор третьи.</div>
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- ══════════════════════════
+       2. Три кабинета
+  ══════════════════════════ -->
+  <h2>👥 Три роли — три кабинета</h2>
+
+  <div class="roles">
+
+    <div class="role-card employer">
+      <div class="role-head">🏢 Работодатель</div>
+      <div class="role-items">
+        <div class="role-item">Обзор — статистика и активность</div>
+        <div class="role-item">Реестр резюме — поиск кандидатов с фильтрами по региону, опыту, 44-ФЗ / 223-ФЗ</div>
+        <div class="role-item">Вакансии — создание и управление</div>
+        <div class="role-item">Избранное — сохранённые кандидаты</div>
+        <div class="role-item">Приглашения — отправленные офферы</div>
+        <div class="role-item">Сообщения — переписка с кандидатами</div>
+        <div class="role-item">Профиль компании — реквизиты, ИНН</div>
+        <div class="role-item">Регионы — присутствие и аналитика</div>
+      </div>
+    </div>
+
+    <div class="role-card seeker">
+      <div class="role-head">👤 Соискатель</div>
+      <div class="role-items">
+        <div class="role-item">Обзор — просмотры и отклики</div>
+        <div class="role-item">Моё резюме — редактирование профиля специалиста по закупкам</div>
+        <div class="role-item">Приглашения — предложения от работодателей</div>
+        <div class="role-item">Сообщения — переписка с работодателями</div>
+        <div class="role-item">Настройки — личные данные</div>
+      </div>
+    </div>
+
+    <div class="role-card admin">
+      <div class="role-head">⚙️ Администратор</div>
+      <div class="role-items">
+        <div class="role-item">Дашборд — общая статистика платформы</div>
+        <div class="role-item">Резюме — модерация и проверка</div>
+        <div class="role-item">Работодатели — верификация компаний</div>
+        <div class="role-item">Вакансии — контроль публикаций</div>
+        <div class="role-item">Пользователи — управление аккаунтами</div>
+        <div class="role-item">Справочники — должности, регионы, специализации</div>
+        <div class="role-item">Журнал действий — лог всех операций</div>
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- ══════════════════════════
+       3. Как движется данные
+  ══════════════════════════ -->
+  <h2>🔄 Как работает платформа — простая схема</h2>
+
+  <h3>Путь работодателя</h3>
+  <div class="flow">
+    <div class="flow-box blue">Регистрация с ИНН</div>
+    <div class="flow-arr">→</div>
+    <div class="flow-box blue">Поиск кандидата</div>
+    <div class="flow-arr">→</div>
+    <div class="flow-box blue">Просмотр резюме</div>
+    <div class="flow-arr">→</div>
+    <div class="flow-box blue">Отправка приглашения</div>
+    <div class="flow-arr">→</div>
+    <div class="flow-box blue">Переписка</div>
+  </div>
+
+  <h3 style="margin-top:14px">Путь соискателя</h3>
+  <div class="flow">
+    <div class="flow-box green">Регистрация</div>
+    <div class="flow-arr">→</div>
+    <div class="flow-box green">Заполнение резюме</div>
+    <div class="flow-arr">→</div>
+    <div class="flow-box green">Получение приглашений</div>
+    <div class="flow-arr">→</div>
+    <div class="flow-box green">Ответ / переписка</div>
+  </div>
+
+  <h3 style="margin-top:14px">ИИ-ассистент (уже подключён)</h3>
+  <div class="flow">
+    <div class="flow-box slate">Вопрос пользователя</div>
+    <div class="flow-arr">→</div>
+    <div class="flow-box purple">API ПРОкадры</div>
+    <div class="flow-arr">→</div>
+    <div class="flow-box purple">Claude / GPT</div>
+    <div class="flow-arr">→</div>
+    <div class="flow-box purple">Ответ на платформе</div>
+  </div>
+  <div class="note" style="margin-top:8px">ИИ знает о платформе: разделах, 44-ФЗ / 223-ФЗ, статусах резюме. Отвечает только по теме, не выдумывает функции, которых нет.</div>
+
+
+  <!-- ══════════════════════════
+       4. Стек технологий
+  ══════════════════════════ -->
+  <h2>🛠 Технологический стек — простыми словами</h2>
+
+  <div class="tech-grid">
+
+    <div class="tech-card">
+      <div class="layer">Интерфейс (то, что видит пользователь)</div>
+      <div class="tech-name">Next.js + React + TypeScript</div>
+      <div class="tech-desc">Современный веб-фреймворк. Быстрая загрузка страниц, работает и на телефоне, и на компьютере. Язык программирования TypeScript защищает от ошибок.</div>
+      <div style="margin-top:6px">
+        <span class="badge">Next.js 15</span>
+        <span class="badge">React</span>
+        <span class="badge">Tailwind CSS</span>
+        <span class="badge">TypeScript</span>
+      </div>
+    </div>
+
+    <div class="tech-card">
+      <div class="layer">Серверная логика (невидимая часть)</div>
+      <div class="tech-name">Server Actions + Prisma ORM</div>
+      <div class="tech-desc">Авторизация, работа с базой данных, бизнес-логика. Prisma — инструмент для безопасной работы с базой без риска ошибок.</div>
+      <div style="margin-top:6px">
+        <span class="badge">Node.js</span>
+        <span class="badge">Prisma</span>
+        <span class="badge">bcrypt</span>
+        <span class="badge">JWT</span>
+      </div>
+    </div>
+
+    <div class="tech-card">
+      <div class="layer">База данных</div>
+      <div class="tech-name">SQLite / LibSQL (Turso)</div>
+      <div class="tech-desc">Лёгкая и надёжная база данных. Для MVP и демонстрации — идеальный выбор: не требует отдельного сервера, легко масштабируется при росте.</div>
+      <div style="margin-top:6px">
+        <span class="badge">SQLite</span>
+        <span class="badge">LibSQL</span>
+        <span class="badge">Turso-ready</span>
+      </div>
+    </div>
+
+    <div class="tech-card">
+      <div class="layer">Искусственный интеллект</div>
+      <div class="tech-name">OpenAI-совместимый API</div>
+      <div class="tech-desc">Платформа подключена к любой LLM-модели через единый интерфейс (Claude, GPT и др.). Системный промпт на русском — ИИ знает специфику закупок.</div>
+      <div style="margin-top:6px">
+        <span class="badge">OpenAI API</span>
+        <span class="badge">Claude</span>
+        <span class="badge">Prompt Engineering</span>
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- ══════════════════════════
+       5. Структура файлов
+  ══════════════════════════ -->
+  <h2>📁 Структура проекта — что где лежит</h2>
+
+  <div class="tree">
+    <div><span class="folder">prokadry/</span></div>
+    <div class="indent1"><span class="folder">app/</span> <span class="comment">— страницы сайта</span></div>
+    <div class="indent2"><span class="file">page.tsx</span> <span class="comment">— главная (лендинг)</span></div>
+    <div class="indent2"><span class="file">auth/page.tsx</span> <span class="comment">— вход и регистрация</span></div>
+    <div class="indent2"><span class="file">dashboard/page.tsx</span> <span class="comment">— личный кабинет</span></div>
+    <div class="indent2"><span class="file">api/chat/route.ts</span> <span class="comment">— ИИ-ассистент (API)</span></div>
+    <div class="indent2"><span class="file">actions/auth.ts</span> <span class="comment">— логика входа и регистрации</span></div>
+    <div class="indent1"><span class="folder">components/</span> <span class="comment">— визуальные блоки</span></div>
+    <div class="indent2"><span class="file">landing.tsx</span> <span class="comment">— главная страница</span></div>
+    <div class="indent2"><span class="file">layout.tsx</span> <span class="comment">— меню и оболочка кабинета</span></div>
+    <div class="indent2"><span class="file">employer.tsx</span> <span class="comment">— все разделы работодателя</span></div>
+    <div class="indent2"><span class="file">seeker.tsx</span> <span class="comment">— все разделы соискателя</span></div>
+    <div class="indent2"><span class="file">admin.tsx</span> <span class="comment">— администраторская панель</span></div>
+    <div class="indent2"><span class="file">registry.tsx</span> <span class="comment">— реестр резюме с поиском</span></div>
+    <div class="indent2"><span class="file">resume.tsx</span> <span class="comment">— карточка кандидата</span></div>
+    <div class="indent2"><span class="file">regions.tsx</span> <span class="comment">— региональный модуль</span></div>
+    <div class="indent2"><span class="file">ui.tsx</span> <span class="comment">— библиотека кнопок, значков, карточек</span></div>
+    <div class="indent1"><span class="folder">lib/</span> <span class="comment">— ядро системы</span></div>
+    <div class="indent2"><span class="file">types.ts</span> <span class="comment">— описание всех объектов (резюме, вакансия, пользователь…)</span></div>
+    <div class="indent2"><span class="file">db.ts</span> <span class="comment">— подключение к базе данных</span></div>
+    <div class="indent2"><span class="file">session.ts</span> <span class="comment">— управление сессиями пользователей</span></div>
+    <div class="indent2"><span class="file">mock-data.ts</span> <span class="comment">— 75 резюме для демонстрации</span></div>
+  </div>
+
+  <div class="note green" style="margin-top:10px">
+    Весь код в одном репозитории, одна команда для запуска. Заказчик получает полный исходный код при подписании акта (п. 8.1 договора).
+  </div>
+
+
+  <!-- ══════════════════════════
+       6. Как рассказывать
+  ══════════════════════════ -->
+  <h2>🎤 Как рассказать Заказчику — сценарий презентации</h2>
+
+  <div class="tips">
+    <div class="tip">
+      <div class="tip-num">1</div>
+      <div class="tip-body">
+        <div class="title">Начать с лендинга (prokadry.ru)</div>
+        <div class="desc">«Вот что видит любой посетитель — кто мы, что предлагаем, для кого. Отсюда два пути: войти или зарегистрироваться.»</div>
+      </div>
+    </div>
+    <div class="tip">
+      <div class="tip-num">2</div>
+      <div class="tip-body">
+        <div class="title">Зайти как Работодатель</div>
+        <div class="desc">«Вот кабинет работодателя. Здесь он ищет специалистов по закупкам — фильтрует по региону, опыту, 44-ФЗ или 223-ФЗ, смотрит карточку, отправляет приглашение.»</div>
+      </div>
+    </div>
+    <div class="tip">
+      <div class="tip-num">3</div>
+      <div class="tip-body">
+        <div class="title">Переключиться на Соискателя</div>
+        <div class="desc">«А вот как видит платформу специалист по закупкам — его резюме, входящие предложения, переписка с работодателем.»</div>
+      </div>
+    </div>
+    <div class="tip">
+      <div class="tip-num">4</div>
+      <div class="tip-body">
+        <div class="title">Показать Администратора</div>
+        <div class="desc">«Это ваш инструмент управления — вы видите всех пользователей, модерируете резюме, верифицируете компании, смотрите журнал действий.»</div>
+      </div>
+    </div>
+    <div class="tip">
+      <div class="tip-num">5</div>
+      <div class="tip-body">
+        <div class="title">Упомянуть ИИ</div>
+        <div class="desc">«Платформа уже подключена к ИИ. Он знает о 44-ФЗ, 223-ФЗ, умеет объяснять разделы и помогать пользователям. В следующем этапе ИИ появится прямо в интерфейсе.»</div>
+      </div>
+    </div>
+    <div class="tip">
+      <div class="tip-num">6</div>
+      <div class="tip-body">
+        <div class="title">Акцент на технологии</div>
+        <div class="desc">«Сделано на Next.js — том же фреймворке, что использует Vercel, TikTok, Notion. Быстро, безопасно, легко масштабировать. Вы получаете полный исходный код.»</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note amber" style="margin-top:16px">
+    <strong>Важно для показа:</strong> заранее войти под каждой ролью в разных вкладках браузера — переключение будет мгновенным и произведёт впечатление.
+  </div>
+
+  <div style="margin-top:28px;font-size:11px;color:#94a3b8;text-align:center">
+    ПРОкадры · Гайд по структуре · АО «АГЗРТ» · 27.04.2026
+  </div>
+
+</div>
+</body>
+</html>

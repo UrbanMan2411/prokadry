@@ -13,10 +13,11 @@ import {
 } from '@/components/employer';
 import {
   SeekerDashboard, MyResume, SeekerInvitations, SeekerMessages, SeekerSettings,
+  SeekerVacancyRegistry, SeekerMapSearch,
 } from '@/components/seeker';
 import {
   AdminDashboard, AdminResumes, AdminEmployers, AdminVacancies,
-  AdminUsers, AdminDicts, AdminLogs,
+  AdminUsers, AdminDicts, AdminLogs, AdminRegions, AdminImport,
 } from '@/components/admin';
 import { RegionList, RegionDetail } from '@/components/regions';
 
@@ -76,6 +77,7 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
   } else if (role === 'seeker') {
     badges['seeker-invitations'] = invitations.filter(i => i.status === 'sent').length;
     badges['seeker-messages'] = messages.filter(m => !m.isRead && m.fromRole === 'employer').length;
+    badges['seeker-vacancies'] = vacancies.filter(v => v.status === 'active').length;
   } else {
     badges['admin-resumes'] = resumes.filter(r => r.status === 'pending').length;
     badges['admin-employers'] = employers.filter(e => e.status === 'pending').length;
@@ -148,10 +150,6 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
           return <EmployerInvitations invitations={invitations} />;
         case 'company':
           return <CompanyProfile />;
-        case 'regions':
-          return (
-            <RegionList onOpenRegion={r => { setSelectedRegion(r); setPage('region-detail'); }} />
-          );
       }
     }
 
@@ -161,6 +159,10 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
           return <SeekerDashboard invitations={invitations} messages={messages} />;
         case 'my-resume':
           return <MyResume />;
+        case 'seeker-vacancies':
+          return <SeekerVacancyRegistry vacancies={vacancies} />;
+        case 'seeker-map':
+          return <SeekerMapSearch vacancies={vacancies} />;
         case 'seeker-invitations':
           return <SeekerInvitations invitations={invitations} setInvitations={setInvitations} />;
         case 'seeker-messages':
@@ -184,6 +186,14 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
           return <AdminUsers employers={employers} />;
         case 'admin-dicts':
           return <AdminDicts />;
+        case 'admin-regions':
+          return <AdminRegions resumes={resumes} vacancies={vacancies} onOpenRegion={r => { setSelectedRegion(r); setPage('admin-region-detail'); }} />;
+        case 'admin-region-detail':
+          return selectedRegion ? (
+            <RegionDetail regionName={selectedRegion} resumes={resumes} vacancies={vacancies} onBack={() => setPage('admin-regions')} />
+          ) : null;
+        case 'admin-import':
+          return <AdminImport />;
         case 'admin-logs':
           return <AdminLogs logs={AUDIT_LOGS} />;
       }

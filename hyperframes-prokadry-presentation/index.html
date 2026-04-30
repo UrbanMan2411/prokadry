@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #f4f8fb;
+        color: #0b1f33;
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      }
+
+      [data-composition-id="main"] {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 12% 12%, rgba(23, 184, 200, 0.18), rgba(23, 184, 200, 0) 34%),
+          radial-gradient(circle at 88% 78%, rgba(23, 105, 224, 0.16), rgba(23, 105, 224, 0) 36%),
+          #f4f8fb;
+      }
+
+      .grain {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        opacity: 0.18;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(11, 31, 51, 0.025) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(11, 31, 51, 0.025) 1px, transparent 1px);
+        background-size: 48px 48px;
+      }
+
+      .orb {
+        position: absolute;
+        border-radius: 999px;
+        z-index: 1;
+        filter: blur(1px);
+        opacity: 0.5;
+      }
+
+      .orb-a {
+        width: 420px;
+        height: 420px;
+        left: -120px;
+        top: 90px;
+        background: rgba(23, 184, 200, 0.18);
+      }
+
+      .orb-b {
+        width: 560px;
+        height: 560px;
+        right: -180px;
+        bottom: -160px;
+        background: rgba(23, 105, 224, 0.16);
+      }
+
+      .scene {
+        position: absolute;
+        inset: 0;
+        z-index: 3;
+        width: 100%;
+        height: 100%;
+        padding: 108px 132px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 34px;
+        opacity: 1;
+      }
+
+      .eyebrow {
+        width: fit-content;
+        padding: 13px 20px;
+        border-radius: 999px;
+        border: 1px solid #d7e4ee;
+        background: rgba(255, 255, 255, 0.78);
+        color: #1769e0;
+        font: 700 22px/1 "IBM Plex Mono", monospace;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-variant-numeric: tabular-nums;
+      }
+
+      h1,
+      h2 {
+        margin: 0;
+        font-family: "Manrope", "Arial", sans-serif;
+        font-weight: 900;
+        letter-spacing: -0.055em;
+        color: #0b1f33;
+      }
+
+      h1 {
+        max-width: 1260px;
+        font-size: 142px;
+        line-height: 0.93;
+      }
+
+      h2 {
+        max-width: 1120px;
+        font-size: 92px;
+        line-height: 0.98;
+      }
+
+      .lead {
+        max-width: 920px;
+        margin: 0;
+        color: #49667d;
+        font-size: 35px;
+        font-weight: 350;
+        line-height: 1.36;
+      }
+
+      .hero-row {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        align-items: center;
+        gap: 70px;
+      }
+
+      .hero-panel {
+        min-height: 570px;
+        padding: 46px;
+        border: 1px solid #d7e4ee;
+        border-radius: 42px;
+        background: rgba(255, 255, 255, 0.82);
+        box-shadow: 0 28px 90px rgba(11, 31, 51, 0.1);
+      }
+
+      .logo-mark {
+        width: 118px;
+        height: 118px;
+        border-radius: 34px;
+        display: grid;
+        place-items: center;
+        border: 2px solid #1769e0;
+        background: #ffffff;
+        color: #1769e0;
+        font: 900 42px/1 "Manrope", sans-serif;
+        box-shadow: 0 26px 70px rgba(23, 105, 224, 0.28);
+      }
+
+      .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 22px;
+        max-width: 1120px;
+      }
+
+      .card {
+        min-height: 214px;
+        padding: 30px;
+        border: 1px solid #d7e4ee;
+        border-radius: 30px;
+        background: rgba(255, 255, 255, 0.88);
+        box-shadow: 0 22px 70px rgba(11, 31, 51, 0.08);
+      }
+
+      .card strong {
+        display: block;
+        margin-bottom: 16px;
+        color: #1769e0;
+        font: 800 54px/1 "IBM Plex Mono", monospace;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .card span {
+        color: #49667d;
+        font-size: 26px;
+        line-height: 1.25;
+      }
+
+      .requirements {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 26px;
+        max-width: 1260px;
+      }
+
+      .req {
+        display: flex;
+        align-items: flex-start;
+        gap: 20px;
+        padding: 26px;
+        border-radius: 28px;
+        background: #ffffff;
+        border: 1px solid #d7e4ee;
+        box-shadow: 0 18px 54px rgba(11, 31, 51, 0.07);
+      }
+
+      .tick {
+        flex: 0 0 auto;
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        color: #0b1f33;
+        background: #d7f7fb;
+        font: 900 24px/1 "Manrope", sans-serif;
+      }
+
+      .req b {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 29px;
+        color: #0b1f33;
+      }
+
+      .req small {
+        color: #49667d;
+        font-size: 23px;
+        line-height: 1.28;
+      }
+
+      .final-card {
+        max-width: 1180px;
+        padding: 62px;
+        border-radius: 48px;
+        background: #ffffff;
+        border: 1px solid #d7e4ee;
+        box-shadow: 0 32px 110px rgba(11, 31, 51, 0.12);
+      }
+
+      .cta {
+        margin-top: 34px;
+        display: inline-flex;
+        align-items: center;
+        gap: 14px;
+        padding: 20px 28px;
+        border-radius: 999px;
+        border: 2px solid #1769e0;
+        background: #ffffff;
+        color: #1769e0;
+        font-size: 28px;
+        font-weight: 800;
+        box-shadow: 0 20px 60px rgba(23, 105, 224, 0.24);
+      }
+
+      .transition-wipe {
+        position: absolute;
+        z-index: 10;
+        inset: 0;
+        background:
+          linear-gradient(90deg, #1769e0 0%, #17b8c8 76%, rgba(23, 184, 200, 0) 100%);
+        filter: blur(0.2px);
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="18"
+      data-width="1920"
+      data-height="1080"
+    >
+      <div class="orb orb-a" data-layout-ignore></div>
+      <div class="orb orb-b" data-layout-ignore></div>
+      <div class="grain" data-layout-ignore></div>
+
+      <section id="scene-1" class="scene clip" data-start="0" data-duration="4.39" data-track-index="1">
+        <div class="hero-row">
+          <div>
+            <div class="eyebrow">ПРОкадры</div>
+            <h1>Найти специалиста по закупкам стало проще</h1>
+            <p class="lead">Платформа соединяет работодателей и кандидатов в сфере 44-ФЗ, 223-ФЗ и тендерного сопровождения.</p>
+          </div>
+          <div class="hero-panel">
+            <div class="logo-mark">ПК</div>
+            <div style="height: 52px"></div>
+            <div class="card">
+              <strong>1 окно</strong>
+              <span>для поиска, вакансий, резюме, приглашений и сообщений</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="scene-2" class="scene clip" data-start="4.39" data-duration="4.40" data-track-index="1">
+        <div class="eyebrow">Работодателям</div>
+        <h2>Быстрый подбор кандидатов под конкретную вакансию</h2>
+        <div class="stat-grid">
+          <div class="card"><strong>Резюме</strong><span>единый реестр специалистов с фильтрами</span></div>
+          <div class="card"><strong>Вакансии</strong><span>создание, статусы, отклики и подбор</span></div>
+          <div class="card"><strong>Контакт</strong><span>приглашения и сообщения внутри системы</span></div>
+        </div>
+      </section>
+
+      <section id="scene-3" class="scene clip" data-start="8.79" data-duration="4.30" data-track-index="1">
+        <div class="eyebrow">Соискателям</div>
+        <h2>Понятный кабинет для поиска работы в закупках</h2>
+        <div class="requirements">
+          <div class="req"><div class="tick">✓</div><div><b>Заполнить резюме</b><small>должность, опыт, зарплата, город и формат работы</small></div></div>
+          <div class="req"><div class="tick">✓</div><div><b>Получать приглашения</b><small>работодатели видят профиль и отправляют предложения</small></div></div>
+          <div class="req"><div class="tick">✓</div><div><b>Общаться напрямую</b><small>переписка и ответы без потери контекста</small></div></div>
+          <div class="req"><div class="tick">✓</div><div><b>Держать профиль актуальным</b><small>резюме можно обновлять в личном кабинете</small></div></div>
+        </div>
+      </section>
+
+      <section id="scene-4" class="scene clip" data-start="13.09" data-duration="4.91" data-track-index="1">
+        <div class="final-card">
+          <div class="eyebrow">AI-помощник</div>
+          <h2>Опишите задачу обычными словами</h2>
+          <p class="lead">Например: “Нужен контрактный управляющий в Москве с опытом ЕИС”. Платформа помогает быстрее перейти от поиска к подходящим кандидатам.</p>
+          <div class="cta">Попробовать ПРОкадры</div>
+        </div>
+      </section>
+
+      <div class="transition-wipe" data-layout-ignore></div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      tl.set(".transition-wipe", { xPercent: -104 }, 0);
+      tl.to(".orb-a", { scale: 1.08, x: 24, y: -18, duration: 9, ease: "sine.inOut", repeat: 1, yoyo: true }, 0);
+      tl.to(".orb-b", { scale: 0.94, x: -30, y: 22, duration: 9, ease: "sine.inOut", repeat: 1, yoyo: true }, 0);
+
+      function animateIfPresent(selector, vars, at) {
+        if (document.querySelector(selector)) {
+          tl.from(selector, vars, at);
+        }
+      }
+
+      function enterScene(scene, at) {
+        animateIfPresent(scene + " .eyebrow", { y: 28, opacity: 0, duration: 0.52, ease: "power3.out" }, at + 0.18);
+        animateIfPresent(scene + " h1, " + scene + " h2", { y: 54, opacity: 0, scale: 0.985, duration: 0.68, ease: "expo.out" }, at + 0.34);
+        animateIfPresent(scene + " .lead", { x: -34, opacity: 0, duration: 0.56, ease: "power2.out" }, at + 0.74);
+        animateIfPresent(scene + " .card, " + scene + " .req, " + scene + " .logo-mark, " + scene + " .cta", {
+          y: 42,
+          opacity: 0,
+          scale: 0.965,
+          duration: 0.54,
+          ease: "back.out(1.45)",
+          stagger: 0.11
+        }, at + 0.9);
+      }
+
+      function wipeTo(fromScene, toScene, at) {
+        tl.to(".transition-wipe", { xPercent: 104, duration: 0.48, ease: "power3.inOut" }, at);
+        tl.set(".transition-wipe", { xPercent: -104 }, at + 0.52);
+      }
+
+      enterScene("#scene-1", 0);
+      wipeTo("#scene-1", "#scene-2", 4.15);
+      enterScene("#scene-2", 4.35);
+      wipeTo("#scene-2", "#scene-3", 8.35);
+      enterScene("#scene-3", 8.55);
+      wipeTo("#scene-3", "#scene-4", 12.85);
+      enterScene("#scene-4", 13.05);
+      tl.to("#scene-4", { opacity: 0, duration: 0.75, ease: "sine.inOut" }, 17.1);
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

@@ -68,6 +68,8 @@ export interface Vacancy {
   salaryTo: number;
   description: string;
   skills: string[];
+  clientSpheres: string[];
+  specialistActivities: string[];
   status: VacancyStatus;
   createdAt: string;
 }
@@ -113,6 +115,8 @@ export interface Dictionaries {
   activityAreas: string[];
   tests: string[];
   specialStatuses: string[];
+  clientSpheres: string[];
+  specialistActivities: string[];
 }
 
 export interface AuditLog {
