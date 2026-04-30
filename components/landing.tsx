@@ -1215,9 +1215,6 @@ function StickyMobileCTA() {
 export default function LandingPage() {
   return (
     <>
-      <a href="#main-content" style={{ position: 'absolute', left: '-9999px', top: 'auto', width: 1, height: 1, overflow: 'hidden' }} onFocus={e => { (e.currentTarget as HTMLElement).style.cssText = 'position:fixed;top:8px;left:8px;width:auto;height:auto;padding:8px 16px;background:#1E40AF;color:white;font-size:14px;font-weight:600;border-radius:6px;z-index:9999;overflow:visible'; }} onBlur={e => { (e.currentTarget as HTMLElement).style.cssText = 'position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden'; }}>
-        Перейти к содержимому
-      </a>
       <Header />
       <main id="main-content">
         <Hero />
