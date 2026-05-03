@@ -885,38 +885,72 @@ export function SeekerInvitations({ invitations, setInvitations }: { invitations
     }).catch(() => {});
   };
 
+  const employerInvites = invitations.filter(i => !i.fromSeeker);
+  const myApplies = invitations.filter(i => i.fromSeeker);
+
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto">
-      <h1 className="text-xl font-bold text-slate-800 mb-5">Приглашения</h1>
+      <h1 className="text-xl font-bold text-slate-800 mb-5">Приглашения и отклики</h1>
       {invitations.length === 0 ? (
-        <div className="text-center py-16 text-slate-400">Приглашений пока нет</div>
+        <div className="text-center py-16 text-slate-400">Приглашений и откликов пока нет</div>
       ) : (
-        <div className="space-y-3">
-          {invitations.map(inv => (
-            <div key={inv.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex items-start gap-4">
-              <Avatar name={inv.employerName} size="md" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="font-semibold text-slate-800">{inv.vacancyTitle}</div>
-                    <div className="text-sm text-blue-600">{inv.employerName}</div>
-                    <p className="text-sm text-slate-500 mt-1 leading-relaxed">{inv.message}</p>
+        <>
+          {employerInvites.length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Приглашения от работодателей ({employerInvites.length})</h2>
+              <div className="space-y-3">
+                {employerInvites.map(inv => (
+                  <div key={inv.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex items-start gap-4">
+                    <Avatar name={inv.employerName} size="md" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="font-semibold text-slate-800">{inv.vacancyTitle}</div>
+                          <div className="text-sm text-blue-600">{inv.employerName}</div>
+                          <p className="text-sm text-slate-500 mt-1 leading-relaxed">{inv.message}</p>
+                        </div>
+                        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                          <StatusBadge status={inv.status} />
+                          <span className="text-xs text-slate-400">{fmtDate(inv.createdAt)}</span>
+                        </div>
+                      </div>
+                      {inv.status === 'sent' && (
+                        <div className="flex gap-2 mt-3">
+                          <Btn size="sm" variant="primary" onClick={() => respond(inv.id, 'accepted')}>Принять</Btn>
+                          <Btn size="sm" variant="secondary" onClick={() => respond(inv.id, 'rejected')}>Отклонить</Btn>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                    <StatusBadge status={inv.status} />
-                    <span className="text-xs text-slate-400">{fmtDate(inv.createdAt)}</span>
-                  </div>
-                </div>
-                {inv.status === 'sent' && (
-                  <div className="flex gap-2 mt-3">
-                    <Btn size="sm" variant="primary" onClick={() => respond(inv.id, 'accepted')}>Принять</Btn>
-                    <Btn size="sm" variant="secondary" onClick={() => respond(inv.id, 'rejected')}>Отклонить</Btn>
-                  </div>
-                )}
+                ))}
               </div>
             </div>
-          ))}
-        </div>
+          )}
+          {myApplies.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Мои отклики ({myApplies.length})</h2>
+              <div className="space-y-3">
+                {myApplies.map(inv => (
+                  <div key={inv.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex items-start gap-4">
+                    <Avatar name={inv.employerName} size="md" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="font-semibold text-slate-800">{inv.vacancyTitle}</div>
+                          <div className="text-sm text-blue-600">{inv.employerName}</div>
+                        </div>
+                        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                          <StatusBadge status={inv.status} />
+                          <span className="text-xs text-slate-400">{fmtDate(inv.createdAt)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

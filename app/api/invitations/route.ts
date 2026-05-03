@@ -52,6 +52,7 @@ export async function GET(_req: NextRequest) {
       message: i.message,
       status: i.status.toLowerCase() as Invitation['status'],
       createdAt: i.sentAt.toISOString(),
+      fromSeeker: i.message === 'Отклик соискателя',
     }));
 
     return NextResponse.json(invitations);

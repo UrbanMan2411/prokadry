@@ -224,7 +224,7 @@ export function AdminEmployers({ employers, setEmployers }: {
     fetch(`/api/employers/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'PENDING' }),
+      body: JSON.stringify({ status: 'SUSPENDED' }),
     }).catch(() => {});
   };
 
@@ -354,6 +354,17 @@ export function AdminUsers({ employers: _ }: { employers: Employer[] }) {
     u.email.toLowerCase().includes(search.toLowerCase())
   );
 
+  const toggleActive = (id: string, current: boolean) => {
+    setUsers(prev => prev.map(u => u.id === id ? { ...u, isActive: !current } : u));
+    fetch(`/api/admin/users/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isActive: !current }),
+    }).catch(() => {
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, isActive: current } : u));
+    });
+  };
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-5">
@@ -369,7 +380,7 @@ export function AdminUsers({ employers: _ }: { employers: Employer[] }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
-              {['Имя', 'Организация', 'Email', 'Роль', 'Статус', 'Зарегистрирован'].map(h => (
+              {['Имя', 'Организация', 'Email', 'Роль', 'Статус', 'Зарегистрирован', ''].map(h => (
                 <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
               ))}
             </tr>
@@ -394,6 +405,20 @@ export function AdminUsers({ employers: _ }: { employers: Employer[] }) {
                   <StatusBadge status={u.isActive ? 'approved' : 'pending'} />
                 </td>
                 <td className="px-4 py-3 text-slate-400 text-xs">{fmtDate(u.createdAt)}</td>
+                <td className="px-4 py-3">
+                  {u.role !== 'admin' && (
+                    <button
+                      onClick={() => toggleActive(u.id, u.isActive)}
+                      className={`text-xs px-2.5 py-1 rounded-lg border transition cursor-pointer ${
+                        u.isActive
+                          ? 'border-red-200 text-red-600 hover:bg-red-50'
+                          : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
+                      }`}
+                    >
+                      {u.isActive ? 'Заблокировать' : 'Разблокировать'}
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

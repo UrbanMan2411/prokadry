@@ -104,6 +104,7 @@ export interface Invitation {
   message: string;
   status: InvitationStatus;
   createdAt: string;
+  fromSeeker?: boolean;
 }
 
 export interface Message {
