@@ -397,10 +397,49 @@ const STATUS_COLORS: Record<string, string> = {
   rejected: 'text-red-700 bg-red-50',
 };
 
+type MatchedVacancy = { id: string; title: string; employerName: string; city: string; workMode: string; salaryFrom: number | null; salaryTo: number | null };
+
+function MatchedVacanciesModal({ vacancies, onClose }: { vacancies: MatchedVacancy[]; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6" onClick={e => e.stopPropagation()}>
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-800">Резюме опубликовано!</h2>
+            <p className="text-sm text-slate-500 mt-0.5">Подходящие вакансии по вашему профилю</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
+        </div>
+        {vacancies.length === 0 ? (
+          <p className="text-sm text-slate-500 py-4 text-center">Подходящих вакансий пока нет. Следите за обновлениями.</p>
+        ) : (
+          <div className="space-y-2 max-h-80 overflow-y-auto">
+            {vacancies.map(v => (
+              <div key={v.id} className="border border-slate-100 rounded-xl p-3 hover:border-blue-200 transition">
+                <div className="font-medium text-slate-800 text-sm">{v.title}</div>
+                <div className="text-xs text-slate-500 mt-0.5">{v.employerName} · {v.city} · {v.workMode}</div>
+                {(v.salaryFrom || v.salaryTo) && (
+                  <div className="text-xs text-emerald-700 font-medium mt-1">
+                    {v.salaryFrom ? `от ${v.salaryFrom.toLocaleString('ru-RU')} ₽` : ''}{v.salaryTo ? ` до ${v.salaryTo.toLocaleString('ru-RU')} ₽` : ''}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="mt-4 flex justify-end">
+          <Btn variant="primary" onClick={onClose}>Отлично</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function MyResume() {
   const [form, setForm] = useState<ResumeFormFull>(emptyForm());
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [matchedVacancies, setMatchedVacancies] = useState<MatchedVacancy[] | null>(null);
 
   useEffect(() => {
     fetch('/api/resumes').then(r => r.json())
@@ -470,6 +509,7 @@ export function MyResume() {
         const data = await res.json();
         setForm(f => ({ ...f, dbStatus: data.status }));
         setSaved(true);
+        if (data.matchedVacancies) setMatchedVacancies(data.matchedVacancies);
       }
     } finally { setSaving(false); }
   };
@@ -513,6 +553,9 @@ export function MyResume() {
 
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto">
+      {matchedVacancies !== null && (
+        <MatchedVacanciesModal vacancies={matchedVacancies} onClose={() => setMatchedVacancies(null)} />
+      )}
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Моё резюме</h1>
@@ -782,11 +825,11 @@ export function MyResume() {
             {saved && <span className="text-sm text-emerald-600">✓ Сохранено</span>}
           </div>
           <div className="flex gap-2">
-            {form.dbId && form.dbStatus === 'draft' && (
-              <Btn variant="secondary" onClick={() => saveToDb('PENDING')} disabled={saving}>Отправить на проверку</Btn>
+            {form.dbId && (form.dbStatus === 'draft' || form.dbStatus === 'rejected') && (
+              <Btn variant="secondary" onClick={() => saveToDb('ACTIVE')} disabled={saving}>Опубликовать</Btn>
             )}
-            {form.dbId && form.dbStatus === 'pending' && (
-              <Btn variant="ghost" onClick={() => saveToDb('DRAFT')} disabled={saving}>Снять с проверки</Btn>
+            {form.dbId && form.dbStatus === 'active' && (
+              <Btn variant="ghost" onClick={() => saveToDb('DRAFT')} disabled={saving}>Снять с публикации</Btn>
             )}
             <Btn variant="primary" onClick={() => saveToDb()} disabled={saving || !form.dbId}>
               {saving ? 'Сохранение…' : 'Сохранить изменения'}

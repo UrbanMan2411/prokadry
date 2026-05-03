@@ -48,10 +48,10 @@ export async function PATCH(
       if (educationYears !== undefined) data.educationYears = educationYears || null;
       if (workMode !== undefined) data.workMode = workMode;
       if (about !== undefined) data.about = about || null;
-      if (status === 'PENDING') data.status = 'PENDING';
+      if (status === 'ACTIVE') { data.status = 'ACTIVE'; data.publishedAt = new Date(); }
       else if (status === 'DRAFT') data.status = 'DRAFT';
 
-      await db.resume.update({ where: { id }, data });
+      const updatedResume = await db.resume.update({ where: { id }, data, select: { position: true, city: true, salary: true, workMode: true } });
 
       // workExperiences — full replace
       if (Array.isArray(workExperiences)) {
@@ -143,7 +143,37 @@ export async function PATCH(
       }
 
       const updated = await db.resume.findUnique({ where: { id }, select: { id: true, status: true } });
-      return NextResponse.json({ id, status: updated!.status.toLowerCase() });
+      const responseStatus = updated!.status.toLowerCase();
+
+      // When published, return matching vacancies
+      if (responseStatus === 'active') {
+        const allVacancies = await db.vacancy.findMany({
+          where: { status: 'ACTIVE' },
+          include: { employer: { select: { name: true } } },
+          take: 50,
+        });
+        const r = updatedResume;
+        const posWords = r.position.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+        const scored = allVacancies.map(v => {
+          let score = 0;
+          if (v.city === r.city) score += 2;
+          if (v.workMode === r.workMode) score += 1;
+          if (r.salary && v.salaryTo && v.salaryTo >= r.salary) score += 1;
+          if (r.salary && v.salaryFrom && v.salaryFrom <= r.salary) score += 1;
+          const titleWords = v.title.toLowerCase();
+          for (const w of posWords) if (titleWords.includes(w)) score += 2;
+          return { score, v };
+        }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 6);
+
+        const matchedVacancies = scored.map(({ v }) => ({
+          id: v.id, title: v.title, employerName: v.employer.name,
+          city: v.city, workMode: v.workMode,
+          salaryFrom: v.salaryFrom, salaryTo: v.salaryTo,
+        }));
+        return NextResponse.json({ id, status: responseStatus, matchedVacancies });
+      }
+
+      return NextResponse.json({ id, status: responseStatus });
     }
 
     if (session.role === 'ADMIN') {
