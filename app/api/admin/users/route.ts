@@ -17,7 +17,8 @@ export async function GET() {
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json(rows.map(u => ({
+    type Row = typeof rows[number];
+    return NextResponse.json(rows.map((u: Row) => ({
       id: u.id,
       email: u.email,
       role: u.role.toLowerCase(),

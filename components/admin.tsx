@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Resume, Employer, Vacancy, AuditLog, AdminStats } from '@/lib/types';
 import { DICTIONARIES } from '@/lib/mock-data';
 import { fmtDate, fmtDateTime, fmtSalary, fmtExp } from '@/lib/utils';
@@ -148,8 +148,8 @@ export function AdminResumes({ resumes, setResumes }: {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filtered.map(r => (
-              <>
-                <tr key={r.id} className="hover:bg-slate-50 transition">
+              <React.Fragment key={r.id}>
+                <tr className="hover:bg-slate-50 transition">
                   <td className="px-3 py-3"><Avatar src={r.photo} name={r.fullName} size="sm" /></td>
                   <td className="px-3 py-3 font-mono text-xs text-slate-400">{r.id.slice(0, 8)}…</td>
                   <td className="px-3 py-3 font-medium text-slate-800">{r.fullName.split(' ').slice(0, 2).join(' ')}</td>
@@ -192,7 +192,7 @@ export function AdminResumes({ resumes, setResumes }: {
                     </td>
                   </tr>
                 )}
-              </>
+              </React.Fragment>
             ))}
           </tbody>
         </table>
