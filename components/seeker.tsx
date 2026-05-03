@@ -405,9 +405,11 @@ export function MyResume() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Мои резюме</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Несколько резюме для разных специализаций</p>
+          <p className="text-sm text-slate-500 mt-0.5">Ваше резюме для работодателей</p>
         </div>
-        <Btn variant="primary" size="sm" onClick={addResume}>+ Добавить резюме</Btn>
+        {!resumes.some(r => r.dbId) && (
+          <Btn variant="primary" size="sm" onClick={addResume}>+ Добавить резюме</Btn>
+        )}
       </div>
 
       <ResumeImportPanel onImport={importResume} />
@@ -660,11 +662,29 @@ export function SeekerMessages({ messages, onMarkRead }: { messages: Message[]; 
 // ── Seeker Settings ────────────────────────────────────────────────────────
 export function SeekerSettings() {
   const [form, setForm] = useState({
-    firstName: 'Иванова', lastName: 'Мария', email: 'maria.ivanova@example.ru', phone: '+7 (910) 555-12-34',
+    firstName: '', lastName: '', email: '', phone: '',
     notifyInvites: true, notifyMessages: true, notifyNews: false,
   });
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const upd = (k: string, v: string | boolean) => { setForm(f => ({ ...f, [k]: v })); setSaved(false); };
+
+  useEffect(() => {
+    fetch('/api/users/me').then(r => r.ok ? r.json() : null).then(data => {
+      if (data) setForm(f => ({ ...f, firstName: data.firstName ?? '', lastName: data.lastName ?? '', email: data.email ?? '', phone: data.phone ?? '' }));
+    }).catch(() => {});
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    await fetch('/api/users/me', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: form.phone }),
+    }).catch(() => {});
+    setSaving(false);
+    setSaved(true);
+  };
 
   return (
     <div className="p-4 md:p-6 max-w-2xl mx-auto">
@@ -675,21 +695,22 @@ export function SeekerSettings() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Фамилия</label>
-              <Input value={form.lastName} onChange={v => upd('lastName', v)} />
+              <Input value={form.lastName} onChange={v => upd('lastName', v)} disabled />
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Имя</label>
-              <Input value={form.firstName} onChange={v => upd('firstName', v)} />
+              <Input value={form.firstName} onChange={v => upd('firstName', v)} disabled />
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Email</label>
-              <Input value={form.email} onChange={v => upd('email', v)} type="email" />
+              <Input value={form.email} onChange={v => upd('email', v)} type="email" disabled />
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Телефон</label>
               <Input value={form.phone} onChange={v => upd('phone', v)} />
             </div>
           </div>
+          <p className="text-xs text-slate-400 mt-3">Имя, фамилия и email редактируются в разделе «Моё резюме».</p>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
@@ -714,7 +735,7 @@ export function SeekerSettings() {
 
         <div className="flex justify-end gap-2 items-center">
           {saved && <span className="text-sm text-emerald-600">✓ Сохранено</span>}
-          <Btn variant="primary" onClick={() => setSaved(true)}>Сохранить</Btn>
+          <Btn variant="primary" onClick={handleSave} disabled={saving}>{saving ? 'Сохранение…' : 'Сохранить'}</Btn>
         </div>
       </div>
     </div>

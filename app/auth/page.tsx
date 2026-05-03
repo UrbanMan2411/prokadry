@@ -159,11 +159,7 @@ function RoleCard({
 
 // ── Employer sign-up form ─────────────────────────────────────────────────────
 
-const INN_DB: Record<string, { name: string; region: string; city: string }> = {
-  '7700000001': { name: 'ООО «ТехноСервис»', region: 'Москва', city: 'Москва' },
-  '7800000001': { name: 'АО «ГородСтрой»', region: 'Санкт-Петербург', city: 'Санкт-Петербург' },
-  '6600000001': { name: 'ФГУП «РосТех»', region: 'Свердловская область', city: 'Екатеринбург' },
-};
+type InnLookupResult = { name: string; region: string; city: string; kpp: string; ogrn: string; legalAddress: string; head: string };
 
 function EmployerForm() {
   const [state, action, pending] = useActionState<SignUpState, FormData>(signUpEmployer, undefined);
@@ -173,19 +169,25 @@ function EmployerForm() {
   const [orgName, setOrgName] = useState('');
   const [region, setRegion] = useState('');
   const [city, setCity] = useState('');
-  const [innStatus, setInnStatus] = useState<'idle' | 'loading' | 'found' | 'not_found' | 'invalid'>('idle');
-  const [innResult, setInnResult] = useState<{ name: string; region: string; city: string } | null>(null);
+  const [innStatus, setInnStatus] = useState<'idle' | 'loading' | 'found' | 'not_found' | 'invalid' | 'error' | 'not_configured'>('idle');
+  const [innResult, setInnResult] = useState<InnLookupResult | null>(null);
   const [innFilled, setInnFilled] = useState(false);
 
-  const lookupInn = (val?: string) => {
-    const target = val ?? inn;
+  const lookupInn = async (val?: string) => {
+    const target = (val ?? inn).trim();
     if (!/^\d{10}(\d{2})?$/.test(target)) { setInnStatus('invalid'); return; }
     setInnStatus('loading');
-    setTimeout(() => {
-      const found = INN_DB[target] ?? null;
-      setInnResult(found);
-      setInnStatus(found ? 'found' : 'not_found');
-    }, 800);
+    try {
+      const res = await fetch(`/api/inn-lookup?inn=${target}`);
+      if (res.status === 503) { setInnStatus('not_configured'); return; }
+      if (res.status === 404) { setInnStatus('not_found'); return; }
+      if (!res.ok) { setInnStatus('error'); return; }
+      const d = await res.json();
+      setInnResult({ name: d.name, region: d.region, city: d.city, kpp: d.kpp, ogrn: d.ogrn, legalAddress: d.legalAddress, head: d.head });
+      setInnStatus('found');
+    } catch {
+      setInnStatus('error');
+    }
   };
 
   const applyInn = () => {
@@ -235,6 +237,8 @@ function EmployerForm() {
           {errs.inn && <p id="field-inn-err" role="alert" className="text-xs text-red-500 mt-1">{errs.inn}</p>}
           {innStatus === 'invalid' && <p id="inn-fmt-err" role="alert" className="text-xs text-red-500 mt-1">ИНН: 10 или 12 цифр</p>}
           {innStatus === 'not_found' && <p id="inn-notfound" role="status" className="text-xs text-amber-600 mt-1">Организация не найдена — заполните вручную</p>}
+          {innStatus === 'not_configured' && <p role="status" className="text-xs text-slate-500 mt-1">Автозаполнение недоступно — заполните вручную</p>}
+          {innStatus === 'error' && <p role="alert" className="text-xs text-red-500 mt-1">Ошибка запроса — попробуйте ещё раз</p>}
           {innStatus === 'found' && innResult && (
             <div role="status" className="mt-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-between gap-2">
               <div>

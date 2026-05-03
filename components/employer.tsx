@@ -981,33 +981,9 @@ export function EmployerInvitations({ invitations }: { invitations: Invitation[]
 
 // ── Company Profile with INN autofill ─────────────────────────────────────
 type InnData = {
-  fullName: string; shortName: string; inn: string; kpp: string; ogrn: string;
-  legalAddress: string; region: string; okved: string; orgStatus: string;
-  head: string; registrationDate: string;
-};
-
-const INN_DB: Record<string, InnData> = {
-  '7700000001': {
-    fullName: 'Общество с ограниченной ответственностью «ТехноСервис»',
-    shortName: 'ООО «ТехноСервис»', inn: '7700000001', kpp: '770001001', ogrn: '1027700000001',
-    legalAddress: '109012, г. Москва, ул. Ленина, д. 1',
-    region: 'Москва', okved: '62.01 — Разработка компьютерного ПО',
-    orgStatus: 'Действующая', head: 'Иванов Алексей Петрович', registrationDate: '15.03.2001',
-  },
-  '7800000001': {
-    fullName: 'Акционерное общество «ГородСтрой»',
-    shortName: 'АО «ГородСтрой»', inn: '7800000001', kpp: '780001001', ogrn: '1047800000001',
-    legalAddress: '190000, г. Санкт-Петербург, Невский пр., д. 10',
-    region: 'Санкт-Петербург', okved: '41.20 — Строительство жилых и нежилых зданий',
-    orgStatus: 'Действующая', head: 'Смирнов Михаил Александрович', registrationDate: '22.07.2004',
-  },
-  '6600000001': {
-    fullName: 'Федеральное государственное унитарное предприятие «РосТех»',
-    shortName: 'ФГУП «РосТех»', inn: '6600000001', kpp: '660001001', ogrn: '1036600000001',
-    legalAddress: '620000, г. Екатеринбург, ул. Малышева, д. 100',
-    region: 'Свердловская область', okved: '25.40 — Производство оружия и боеприпасов',
-    orgStatus: 'Действующая', head: 'Кузнецов Сергей Дмитриевич', registrationDate: '08.11.2003',
-  },
+  name: string; fullName?: string; inn: string; kpp?: string; ogrn?: string;
+  legalAddress?: string; region?: string; city?: string; okved?: string;
+  orgStatus?: string; head?: string; registrationDate?: string;
 };
 
 type InnLookupState = 'idle' | 'loading' | 'found' | 'not_found' | 'invalid' | 'error';
@@ -1056,27 +1032,34 @@ export function CompanyProfile() {
 
   const upd = (k: string, v: string) => { setForm(f => ({ ...f, [k]: v })); setSaved(false); };
 
-  const handleInnLookup = () => {
+  const handleInnLookup = async () => {
     const inn = form.inn.trim();
     if (!validateINN(inn)) { setInnLookupState('invalid'); setInnResult(null); return; }
     setInnLookupState('loading');
     setInnResult(null);
-    setTimeout(() => {
-      const found = INN_DB[inn];
-      if (found) { setInnResult(found); setInnLookupState('found'); }
-      else { setInnLookupState('not_found'); }
-    }, 800);
+    try {
+      const res = await fetch(`/api/inn-lookup?inn=${inn}`);
+      if (res.status === 503) { setInnLookupState('not_found'); return; }
+      if (res.status === 404) { setInnLookupState('not_found'); return; }
+      if (!res.ok) { setInnLookupState('error'); return; }
+      const d = await res.json();
+      setInnResult(d);
+      setInnLookupState('found');
+    } catch {
+      setInnLookupState('error');
+    }
   };
 
   const handleFillProfile = () => {
     if (!innResult) return;
     setForm(f => ({
       ...f,
-      name: innResult.shortName,
-      inn: innResult.inn, kpp: innResult.kpp, ogrn: innResult.ogrn,
-      legalAddress: innResult.legalAddress, region: innResult.region,
-      okved: innResult.okved, orgStatus: innResult.orgStatus,
-      head: innResult.head, registrationDate: innResult.registrationDate,
+      name: innResult.name,
+      inn: innResult.inn, kpp: innResult.kpp ?? '', ogrn: innResult.ogrn ?? '',
+      legalAddress: innResult.legalAddress ?? '', region: innResult.region ?? '',
+      city: innResult.city ?? f.city,
+      okved: innResult.okved ?? '', orgStatus: innResult.orgStatus ?? '',
+      head: innResult.head ?? '', registrationDate: innResult.registrationDate ?? '',
     }));
     setSaved(false);
     setInnLookupState('idle');
@@ -1114,7 +1097,7 @@ export function CompanyProfile() {
           <div className="bg-white rounded-lg border border-blue-200 p-3 mt-1">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <div className="font-semibold text-slate-800 text-sm">{innResult.shortName}</div>
+                <div className="font-semibold text-slate-800 text-sm">{innResult.name}</div>
                 <div className="text-xs text-slate-500 mt-0.5">{innResult.fullName}</div>
                 <div className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-slate-600">
                   <span>КПП: {innResult.kpp}</span>

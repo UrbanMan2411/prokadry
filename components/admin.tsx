@@ -295,8 +295,14 @@ export function AdminVacancies({ vacancies, setVacancies }: {
                 <td className="px-4 py-3 text-slate-400 text-xs">{fmtDate(v.createdAt)}</td>
                 <td className="px-4 py-3">
                   {v.status === 'active'
-                    ? <Btn size="xs" variant="ghost" onClick={() => setVacancies(prev => prev.map(x => x.id === v.id ? { ...x, status: 'archived' } : x))}>В архив</Btn>
-                    : <Btn size="xs" variant="ghost" onClick={() => setVacancies(prev => prev.map(x => x.id === v.id ? { ...x, status: 'active' } : x))}>Активировать</Btn>
+                    ? <Btn size="xs" variant="ghost" onClick={() => {
+                        setVacancies(prev => prev.map(x => x.id === v.id ? { ...x, status: 'archived' } : x));
+                        fetch(`/api/vacancies/${v.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'archived' }) }).catch(() => {});
+                      }}>В архив</Btn>
+                    : <Btn size="xs" variant="ghost" onClick={() => {
+                        setVacancies(prev => prev.map(x => x.id === v.id ? { ...x, status: 'active' } : x));
+                        fetch(`/api/vacancies/${v.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'active' }) }).catch(() => {});
+                      }}>Активировать</Btn>
                   }
                 </td>
               </tr>

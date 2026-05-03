@@ -10,18 +10,22 @@ export async function PATCH(
   try {
     const { id } = await params;
     const session = await getSession();
-    if (!session || session.role !== 'EMPLOYER') {
+    if (!session || (session.role !== 'EMPLOYER' && session.role !== 'ADMIN')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const emp = await db.employer.findUnique({
-      where: { userId: session.userId },
-      select: { id: true },
-    });
-    if (!emp) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
-    const existing = await db.vacancy.findFirst({ where: { id, employerId: emp.id } });
-    if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (session.role === 'ADMIN') {
+      const existing = await db.vacancy.findUnique({ where: { id }, select: { id: true } });
+      if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    } else {
+      const emp = await db.employer.findUnique({
+        where: { userId: session.userId },
+        select: { id: true },
+      });
+      if (!emp) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      const existing = await db.vacancy.findFirst({ where: { id, employerId: emp.id } });
+      if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
 
     const body = await req.json();
     const { status, title, department, city, workMode, salaryFrom, salaryTo, description } = body;
