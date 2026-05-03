@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import type { Resume, Employer, Vacancy, AuditLog, AdminStats } from '@/lib/types';
-import { ADMIN_STATS, DICTIONARIES, REGION_STATS } from '@/lib/mock-data';
+import { DICTIONARIES } from '@/lib/mock-data';
 import { fmtDate, fmtDateTime, fmtSalary, fmtExp } from '@/lib/utils';
 import { Badge, Btn, Input, StatCard, StatusBadge, Avatar } from './ui';
 
 // ── Admin Dashboard ────────────────────────────────────────────────────────
 export function AdminDashboard({ logs }: { logs: AuditLog[] }) {
-  const [s, setS] = useState<AdminStats>(ADMIN_STATS);
+  const [s, setS] = useState<AdminStats>({ totalResumes: 0, activeResumes: 0, pendingResumes: 0, totalEmployers: 0, approvedEmployers: 0, totalVacancies: 0, activeVacancies: 0, totalInvitations: 0 });
   useEffect(() => {
     fetch('/api/admin/stats').then(r => r.json()).then(setS).catch(() => {});
   }, []);
@@ -679,6 +679,25 @@ export function AdminImport() {
   );
 }
 
+// ── Region stats helper ────────────────────────────────────────────────────
+function computeRegionStatsAdmin(resumes: Resume[], vacancies: Vacancy[]) {
+  const map = new Map<string, { city: string; vacs: number; res: Resume[] }>();
+  vacancies.filter(v => v.status === 'active').forEach(v => {
+    const key = v.region || v.city; if (!key) return;
+    const e = map.get(key) ?? { city: v.city, vacs: 0, res: [] }; e.vacs++; map.set(key, e);
+  });
+  resumes.filter(r => r.status === 'active').forEach(r => {
+    const key = r.region || r.city; if (!key) return;
+    const e = map.get(key) ?? { city: r.city, vacs: 0, res: [] }; e.res.push(r); map.set(key, e);
+  });
+  return Array.from(map.entries()).map(([region, d]) => {
+    const salaried = d.res.filter(r => r.salary);
+    const avgSalary = salaried.length > 0 ? Math.round(salaried.reduce((s, r) => s + (r.salary ?? 0), 0) / salaried.length) : 0;
+    const sdi = d.res.length > 0 ? Math.round((d.vacs / d.res.length) * 100) / 100 : 0;
+    return { name: d.city || region, region, vacanciesCount: d.vacs, resumesCount: d.res.length, avgSalary, supplyDemandIndex: sdi, rating: Math.min(10, Math.max(1, Math.round(sdi * 3 + Math.min(d.res.length / 3, 7)))) };
+  });
+}
+
 // ── Admin Regions (Кадровая карта) ─────────────────────────────────────────
 export function AdminRegions({ resumes, vacancies, onOpenRegion }: {
   resumes: Resume[]; vacancies: Vacancy[];
@@ -688,13 +707,14 @@ export function AdminRegions({ resumes, vacancies, onOpenRegion }: {
   const [emailTarget, setEmailTarget] = useState('');
   const [emailSent, setEmailSent] = useState(false);
 
-  const stats = REGION_STATS.filter(r =>
+  const allRegionStats = computeRegionStatsAdmin(resumes, vacancies);
+  const stats = allRegionStats.filter(r =>
     !search || r.region.toLowerCase().includes(search.toLowerCase()) || r.name.toLowerCase().includes(search.toLowerCase())
   );
 
   const totalResumes = resumes.filter(r => r.status === 'active').length;
   const totalVacancies = vacancies.filter(v => v.status === 'active').length;
-  const deficitRegions = REGION_STATS.filter(r => r.supplyDemandIndex > 1).length;
+  const deficitRegions = allRegionStats.filter(r => r.supplyDemandIndex > 1).length;
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
@@ -704,7 +724,7 @@ export function AdminRegions({ resumes, vacancies, onOpenRegion }: {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Регионов" value={REGION_STATS.length} color="blue" icon={
+        <StatCard label="Регионов" value={allRegionStats.length} color="blue" icon={
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064" />
           </svg>
@@ -770,7 +790,7 @@ export function AdminRegions({ resumes, vacancies, onOpenRegion }: {
                     {r.supplyDemandIndex > 1 ? 'Дефицит' : 'Норма'}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-slate-700">{r.avgSalary.toLocaleString('ru')} ₽</td>
+                <td className="px-4 py-3 text-slate-700">{r.avgSalary > 0 ? `${r.avgSalary.toLocaleString('ru')} ₽` : '—'}</td>
                 <td className="px-4 py-3">
                   <button onClick={() => onOpenRegion(r.region)}
                     className="text-xs text-blue-600 hover:text-blue-800 font-medium transition">Детали →</button>

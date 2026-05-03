@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Resume, Vacancy } from '@/lib/types';
-import { DICTIONARIES, RESUMES } from '@/lib/mock-data';
+import { DICTIONARIES } from '@/lib/mock-data';
 import { fmtSalary, fmtDate, fmtExp } from '@/lib/utils';
 import { Badge, Btn, Avatar, StarBtn, EmptyState, Modal } from './ui';
 
@@ -129,15 +129,15 @@ function RangeInputs({ labelFrom, labelTo, valueFrom, valueTo, onFrom, onTo, pla
   );
 }
 
-function FilterSidebar({ filters, onChange, onReset, activeCount, open, onClose }: {
+function FilterSidebar({ filters, onChange, onReset, activeCount, open, onClose, regions }: {
   filters: Filters;
   onChange: <K extends keyof Filters>(k: K, v: Filters[K]) => void;
   onReset: () => void;
   activeCount: number;
   open: boolean;
   onClose: () => void;
+  regions: string[];
 }) {
-  const regions = [...new Set(RESUMES.map(r => r.region))].sort();
 
   return (
     <>
@@ -746,7 +746,7 @@ export function ResumeRegistry({
         resumes={bulkResumes}
         vacancies={vacancies}
       />
-      <FilterSidebar filters={filters} onChange={updateFilter} onReset={resetFilters} activeCount={activeCount} open={filterOpen} onClose={() => setFilterOpen(false)} />
+      <FilterSidebar filters={filters} onChange={updateFilter} onReset={resetFilters} activeCount={activeCount} open={filterOpen} onClose={() => setFilterOpen(false)} regions={[...new Set(resumes.map(r => r.region))].sort()} />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}

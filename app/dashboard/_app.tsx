@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import type { Role } from '@/lib/types';
 import type { Resume, Vacancy, Employer, Message, Invitation } from '@/lib/types';
-import { AUDIT_LOGS } from '@/lib/mock-data';
 import { AppShell } from '@/components/layout';
 import { ResumeRegistry } from '@/components/registry';
 import { ResumeDetail, InviteModal } from '@/components/resume';
@@ -105,6 +104,10 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
       );
     }
 
+    if (page === 'regions') {
+      return <RegionList resumes={resumes} vacancies={vacancies} onOpenRegion={r => { setSelectedRegion(r); setPage('region-detail'); }} />;
+    }
+
     if (page === 'region-detail' && selectedRegion) {
       return (
         <RegionDetail
@@ -191,7 +194,7 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
     if (role === 'admin') {
       switch (page) {
         case 'admin-dashboard':
-          return <AdminDashboard logs={AUDIT_LOGS} />;
+          return <AdminDashboard logs={[]} />;
         case 'admin-resumes':
           return <AdminResumes resumes={resumes} setResumes={setResumes} />;
         case 'admin-employers':
@@ -211,7 +214,7 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
         case 'admin-import':
           return <AdminImport />;
         case 'admin-logs':
-          return <AdminLogs logs={AUDIT_LOGS} />;
+          return <AdminLogs logs={[]} />;
       }
     }
 

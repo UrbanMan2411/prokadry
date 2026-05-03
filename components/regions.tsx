@@ -1,9 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { RegionStat } from '@/lib/types';
-import type { Resume, Vacancy } from '@/lib/types';
-import { REGION_STATS } from '@/lib/mock-data';
+import type { RegionStat, Resume, Vacancy } from '@/lib/types';
 import { fmtSalary, fmtExp } from '@/lib/utils';
 
 function Bar({ pct, color = 'bg-blue-400' }: { pct: number; color?: string }) {
@@ -14,6 +12,36 @@ function Bar({ pct, color = 'bg-blue-400' }: { pct: number; color?: string }) {
   );
 }
 
+function computeRegionStats(resumes: Resume[], vacancies: Vacancy[]): RegionStat[] {
+  const map = new Map<string, { city: string; vacs: number; res: Resume[] }>();
+
+  vacancies.filter(v => v.status === 'active').forEach(v => {
+    const key = v.region || v.city;
+    if (!key) return;
+    const e = map.get(key) ?? { city: v.city, vacs: 0, res: [] };
+    e.vacs++;
+    map.set(key, e);
+  });
+
+  resumes.filter(r => r.status === 'active').forEach(r => {
+    const key = r.region || r.city;
+    if (!key) return;
+    const e = map.get(key) ?? { city: r.city, vacs: 0, res: [] };
+    e.res.push(r);
+    map.set(key, e);
+  });
+
+  return Array.from(map.entries()).map(([region, d]) => {
+    const salaried = d.res.filter(r => r.salary);
+    const avgSalary = salaried.length > 0
+      ? Math.round(salaried.reduce((s, r) => s + (r.salary ?? 0), 0) / salaried.length)
+      : 0;
+    const sdi = d.res.length > 0 ? Math.round((d.vacs / d.res.length) * 100) / 100 : 0;
+    const rating = Math.min(10, Math.max(1, Math.round(sdi * 3 + Math.min(d.res.length / 3, 7))));
+    return { name: d.city || region, region, vacanciesCount: d.vacs, resumesCount: d.res.length, avgSalary, supplyDemandIndex: sdi, rating };
+  });
+}
+
 type SortKey = keyof RegionStat;
 
 function SortIcon({ col, sortCol, sortDir }: { col: SortKey; sortCol: SortKey; sortDir: 'asc' | 'desc' }) {
@@ -21,9 +49,9 @@ function SortIcon({ col, sortCol, sortDir }: { col: SortKey; sortCol: SortKey; s
   return <span className="ml-1 text-blue-500 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>;
 }
 
-export function RegionList({ onOpenRegion }: { onOpenRegion: (region: string) => void }) {
+export function RegionList({ resumes, vacancies, onOpenRegion }: { resumes: Resume[]; vacancies: Vacancy[]; onOpenRegion: (region: string) => void }) {
   const [search, setSearch] = useState('');
-  const [sortCol, setSortCol] = useState<SortKey>('rating');
+  const [sortCol, setSortCol] = useState<SortKey>('resumesCount');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   const handleSort = (col: SortKey) => {
@@ -31,31 +59,28 @@ export function RegionList({ onOpenRegion }: { onOpenRegion: (region: string) =>
     else { setSortCol(col); setSortDir('desc'); }
   };
 
-  let data = REGION_STATS;
-  if (search) data = data.filter(r =>
+  const allStats = computeRegionStats(resumes, vacancies);
+  let data = search ? allStats.filter(r =>
     r.name.toLowerCase().includes(search.toLowerCase()) ||
     r.region.toLowerCase().includes(search.toLowerCase())
-  );
+  ) : allStats;
   data = [...data].sort((a, b) => {
-    const av = a[sortCol];
-    const bv = b[sortCol];
-    const cmp = typeof av === 'string'
-      ? (av as string).localeCompare(bv as string, 'ru')
-      : (av as number) - (bv as number);
+    const av = a[sortCol], bv = b[sortCol];
+    const cmp = typeof av === 'string' ? (av as string).localeCompare(bv as string, 'ru') : (av as number) - (bv as number);
     return sortDir === 'asc' ? cmp : -cmp;
   });
 
-  const maxVac = Math.max(...REGION_STATS.map(r => r.vacanciesCount), 1);
-  const maxRes = Math.max(...REGION_STATS.map(r => r.resumesCount), 1);
-  const totalVac = REGION_STATS.reduce((s, r) => s + r.vacanciesCount, 0);
-  const totalRes = REGION_STATS.reduce((s, r) => s + r.resumesCount, 0);
-  const avgSalaryAll = Math.round(REGION_STATS.reduce((s, r) => s + r.avgSalary, 0) / REGION_STATS.length);
+  const maxVac = Math.max(...allStats.map(r => r.vacanciesCount), 1);
+  const maxRes = Math.max(...allStats.map(r => r.resumesCount), 1);
+  const totalVac = allStats.reduce((s, r) => s + r.vacanciesCount, 0);
+  const totalRes = allStats.reduce((s, r) => s + r.resumesCount, 0);
+  const avgSalaryAll = allStats.length > 0
+    ? Math.round(allStats.filter(r => r.avgSalary > 0).reduce((s, r) => s + r.avgSalary, 0) / Math.max(allStats.filter(r => r.avgSalary > 0).length, 1))
+    : 0;
 
   const Th = ({ col, label }: { col: SortKey; label: string }) => (
-    <th
-      onClick={() => handleSort(col)}
-      className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide cursor-pointer hover:text-slate-700 select-none whitespace-nowrap"
-    >
+    <th onClick={() => handleSort(col)}
+      className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide cursor-pointer hover:text-slate-700 select-none whitespace-nowrap">
       {label}<SortIcon col={col} sortCol={sortCol} sortDir={sortDir} />
     </th>
   );
@@ -69,7 +94,7 @@ export function RegionList({ onOpenRegion }: { onOpenRegion: (region: string) =>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
-          <div className="text-2xl font-bold text-slate-800">{REGION_STATS.length}</div>
+          <div className="text-2xl font-bold text-slate-800">{allStats.length}</div>
           <div className="text-xs text-slate-500 mt-0.5">регионов</div>
         </div>
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
@@ -81,17 +106,15 @@ export function RegionList({ onOpenRegion }: { onOpenRegion: (region: string) =>
           <div className="text-xs text-slate-500 mt-0.5">активных резюме</div>
         </div>
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
-          <div className="text-2xl font-bold text-emerald-600">{Math.round(avgSalaryAll / 1000)}к ₽</div>
+          <div className="text-2xl font-bold text-emerald-600">{avgSalaryAll > 0 ? `${Math.round(avgSalaryAll / 1000)}к ₽` : '—'}</div>
           <div className="text-xs text-slate-500 mt-0.5">средняя зарплата</div>
         </div>
       </div>
 
       <div className="mb-4">
-        <input
-          type="text" value={search} onChange={e => setSearch(e.target.value)}
+        <input type="text" value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Поиск по городу или региону..."
-          className="w-full max-w-sm rounded-lg border border-slate-200 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+          className="w-full max-w-sm rounded-lg border border-slate-200 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -109,11 +132,8 @@ export function RegionList({ onOpenRegion }: { onOpenRegion: (region: string) =>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {data.map(r => (
-                <tr
-                  key={r.region}
-                  onClick={() => onOpenRegion(r.region)}
-                  className="hover:bg-blue-50/50 cursor-pointer transition-colors"
-                >
+                <tr key={r.region} onClick={() => onOpenRegion(r.region)}
+                  className="hover:bg-blue-50/50 cursor-pointer transition-colors">
                   <td className="px-4 py-3">
                     <div className="font-medium text-slate-800">{r.name}</div>
                     <div className="text-[11px] text-slate-400 mt-0.5 leading-snug max-w-[200px] truncate">{r.region}</div>
@@ -127,7 +147,7 @@ export function RegionList({ onOpenRegion }: { onOpenRegion: (region: string) =>
                     <Bar pct={(r.resumesCount / maxRes) * 100} color="bg-cyan-400" />
                   </td>
                   <td className="px-4 py-3 font-medium text-slate-700 whitespace-nowrap">
-                    {r.avgSalary.toLocaleString('ru-RU')} ₽
+                    {r.avgSalary > 0 ? `${r.avgSalary.toLocaleString('ru-RU')} ₽` : '—'}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`font-semibold ${r.supplyDemandIndex >= 1 ? 'text-emerald-600' : 'text-amber-600'}`}>
@@ -141,10 +161,8 @@ export function RegionList({ onOpenRegion }: { onOpenRegion: (region: string) =>
                       <span className="text-xs text-slate-400">/10</span>
                     </div>
                     <div className="w-12 h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1">
-                      <div
-                        className={`h-full rounded-full ${r.rating >= 7 ? 'bg-emerald-400' : r.rating >= 5 ? 'bg-amber-400' : 'bg-red-400'}`}
-                        style={{ width: `${r.rating * 10}%` }}
-                      />
+                      <div className={`h-full rounded-full ${r.rating >= 7 ? 'bg-emerald-400' : r.rating >= 5 ? 'bg-amber-400' : 'bg-red-400'}`}
+                        style={{ width: `${r.rating * 10}%` }} />
                     </div>
                   </td>
                 </tr>
@@ -153,7 +171,9 @@ export function RegionList({ onOpenRegion }: { onOpenRegion: (region: string) =>
           </table>
         </div>
         {data.length === 0 && (
-          <div className="py-12 text-center text-sm text-slate-400">Регионы не найдены</div>
+          <div className="py-12 text-center text-sm text-slate-400">
+            {allStats.length === 0 ? 'Нет данных — добавьте резюме и вакансии' : 'Регионы не найдены'}
+          </div>
         )}
       </div>
 
@@ -169,9 +189,17 @@ export function RegionDetail({
 }: {
   regionName: string; resumes: Resume[]; vacancies: Vacancy[]; onBack: () => void;
 }) {
-  const stat = REGION_STATS.find(r => r.region === regionName);
   const regionVacs = vacancies.filter(v => v.region === regionName && v.status === 'active');
   const regionRes = resumes.filter(r => r.region === regionName && r.status === 'active');
+
+  const salaried = regionRes.filter(r => r.salary);
+  const avgSalary = salaried.length > 0
+    ? Math.round(salaried.reduce((s, r) => s + (r.salary ?? 0), 0) / salaried.length)
+    : 0;
+  const sdi = regionRes.length > 0 ? Math.round((regionVacs.length / regionRes.length) * 100) / 100 : 0;
+  const rating = regionRes.length + regionVacs.length > 0
+    ? Math.min(10, Math.max(1, Math.round(sdi * 3 + Math.min(regionRes.length / 3, 7))))
+    : 0;
 
   const salaryBuckets = [
     { label: '< 60к', min: 0, max: 60000 },
@@ -187,10 +215,8 @@ export function RegionDetail({
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
-      <button
-        onClick={onBack}
-        className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 font-medium mb-5 transition"
-      >
+      <button onClick={onBack}
+        className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 font-medium mb-5 transition">
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
@@ -202,21 +228,19 @@ export function RegionDetail({
         <p className="text-sm text-slate-500 mt-0.5">Рынок труда в сфере государственных закупок</p>
       </div>
 
-      {stat && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          {[
-            { label: 'вакансий', value: stat.vacanciesCount, cls: 'text-blue-600' },
-            { label: 'резюме', value: stat.resumesCount, cls: 'text-cyan-600' },
-            { label: 'средн. зарплата', value: stat.avgSalary.toLocaleString('ru-RU') + ' ₽', cls: 'text-slate-800' },
-            { label: 'рейтинг активности', value: `${stat.rating}/10`, cls: stat.rating >= 7 ? 'text-emerald-600' : stat.rating >= 5 ? 'text-amber-600' : 'text-red-500' },
-          ].map(s => (
-            <div key={s.label} className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
-              <div className={`text-2xl font-bold ${s.cls}`}>{s.value}</div>
-              <div className="text-xs text-slate-500 mt-0.5">{s.label}</div>
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {[
+          { label: 'вакансий', value: regionVacs.length, cls: 'text-blue-600' },
+          { label: 'резюме', value: regionRes.length, cls: 'text-cyan-600' },
+          { label: 'средн. зарплата', value: avgSalary > 0 ? `${avgSalary.toLocaleString('ru-RU')} ₽` : '—', cls: 'text-slate-800' },
+          { label: 'рейтинг активности', value: rating > 0 ? `${rating}/10` : '—', cls: rating >= 7 ? 'text-emerald-600' : rating >= 5 ? 'text-amber-600' : 'text-red-500' },
+        ].map(s => (
+          <div key={s.label} className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
+            <div className={`text-2xl font-bold ${s.cls}`}>{s.value}</div>
+            <div className="text-xs text-slate-500 mt-0.5">{s.label}</div>
+          </div>
+        ))}
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm">
@@ -224,16 +248,15 @@ export function RegionDetail({
             <h2 className="text-sm font-semibold text-slate-800">Активные вакансии ({regionVacs.length})</h2>
           </div>
           <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
-            {regionVacs.length === 0 && (
-              <div className="py-8 text-center text-sm text-slate-400">Вакансий пока нет</div>
-            )}
+            {regionVacs.length === 0 && <div className="py-8 text-center text-sm text-slate-400">Вакансий пока нет</div>}
             {regionVacs.map(v => (
               <div key={v.id} className="flex items-start gap-3 px-5 py-3">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0 mt-1.5" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-slate-800 truncate">{v.title}</div>
                   <div className="text-xs text-slate-400 mt-0.5">
-                    {v.employerName} · {v.salaryFrom.toLocaleString('ru-RU')}–{v.salaryTo.toLocaleString('ru-RU')} ₽
+                    {v.employerName} · {v.salaryFrom ? `${v.salaryFrom.toLocaleString('ru-RU')}` : ''}
+                    {v.salaryTo ? `–${v.salaryTo.toLocaleString('ru-RU')} ₽` : ''}
                   </div>
                 </div>
               </div>
@@ -246,9 +269,7 @@ export function RegionDetail({
             <h2 className="text-sm font-semibold text-slate-800">Специалисты ({regionRes.length})</h2>
           </div>
           <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
-            {regionRes.length === 0 && (
-              <div className="py-8 text-center text-sm text-slate-400">Резюме пока нет</div>
-            )}
+            {regionRes.length === 0 && <div className="py-8 text-center text-sm text-slate-400">Резюме пока нет</div>}
             {regionRes.map(r => (
               <div key={r.id} className="flex items-center gap-3 px-5 py-3">
                 <div className="flex-1 min-w-0">
@@ -266,7 +287,6 @@ export function RegionDetail({
         </div>
       </div>
 
-      {/* Salary distribution — CSS-only bar chart */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm mb-6">
         <div className="px-5 py-4 border-b border-slate-100">
           <h2 className="text-sm font-semibold text-slate-800">Распределение зарплат специалистов</h2>
@@ -275,13 +295,9 @@ export function RegionDetail({
           <div className="flex items-end gap-3 h-28">
             {salaryBuckets.map(b => (
               <div key={b.label} className="flex-1 flex flex-col items-center gap-1">
-                {b.count > 0 && (
-                  <div className="text-xs font-semibold text-slate-600">{b.count}</div>
-                )}
-                <div
-                  className="w-full bg-blue-400 rounded-t"
-                  style={{ height: `${Math.max((b.count / maxBucket) * 80, b.count > 0 ? 4 : 0)}px` }}
-                />
+                {b.count > 0 && <div className="text-xs font-semibold text-slate-600">{b.count}</div>}
+                <div className="w-full bg-blue-400 rounded-t"
+                  style={{ height: `${Math.max((b.count / maxBucket) * 80, b.count > 0 ? 4 : 0)}px` }} />
                 <div className="text-[10px] text-slate-400 text-center leading-tight mt-1">{b.label}</div>
               </div>
             ))}
@@ -289,7 +305,6 @@ export function RegionDetail({
         </div>
       </div>
 
-      {/* Social support */}
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm">
         <div className="px-5 py-4 border-b border-slate-100">
           <h2 className="text-sm font-semibold text-slate-800">Социальные категории специалистов</h2>
