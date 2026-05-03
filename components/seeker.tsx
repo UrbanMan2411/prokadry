@@ -83,12 +83,11 @@ export function SeekerDashboard({ invitations, messages }: { invitations: Invita
 }
 
 // ── My Resume (multi-resume) ────────────────────────────────────────────────
-type ResumeForm = { id: string; position: string; city: string; salary: string; experience: string; education: string; workMode: string; about: string };
+type ResumeForm = { id: string; dbId: string; position: string; city: string; salary: string; experience: string; education: string; workMode: string; about: string; dbStatus: string };
 
 const defaultResume = (id: string, position: string): ResumeForm => ({
-  id, position, city: 'Москва', salary: '90000', experience: '5',
-  education: 'Высшее', workMode: 'Офис',
-  about: 'Опытный специалист в сфере государственных и корпоративных закупок.',
+  id, dbId: '', position, city: '', salary: '', experience: '0',
+  education: 'Высшее', workMode: 'Офис', about: '', dbStatus: 'draft',
 });
 
 type ImportedResume = {
@@ -296,12 +295,43 @@ function ResumeImportPanel({ onImport }: { onImport: (r: ImportedResume) => void
   );
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  draft: 'Черновик', pending: 'На проверке', active: 'Опубликовано', rejected: 'Отклонено', archived: 'В архиве',
+};
+const STATUS_COLORS: Record<string, string> = {
+  draft: 'text-slate-500 bg-slate-100',
+  pending: 'text-amber-700 bg-amber-50',
+  active: 'text-emerald-700 bg-emerald-50',
+  rejected: 'text-red-700 bg-red-50',
+};
+
 export function MyResume() {
-  const [resumes, setResumes] = useState<ResumeForm[]>([
-    defaultResume('r1', 'Специалист по закупкам'),
-  ]);
+  const [resumes, setResumes] = useState<ResumeForm[]>([defaultResume('r1', '')]);
   const [active, setActive] = useState('r1');
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/resumes')
+      .then(r => r.json())
+      .then((data: import('@/lib/types').Resume[]) => {
+        if (data.length > 0) {
+          const r = data[0];
+          setResumes([{
+            id: 'r1', dbId: r.id,
+            position: r.position,
+            city: r.city,
+            salary: r.salary ? String(r.salary) : '',
+            experience: String(r.experience),
+            education: r.education,
+            workMode: r.workMode,
+            about: r.about ?? '',
+            dbStatus: r.status,
+          }]);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const form = resumes.find(r => r.id === active)!;
   const upd = (k: string, v: string) => {
@@ -321,7 +351,7 @@ export function MyResume() {
     const workModeMap: Record<string, string> = { remote: 'remote', hybrid: 'hybrid', office: 'office' };
     const eduMap: Record<string, string> = { higher: 'higher', secondary_special: 'secondary_special' };
     const newR: ResumeForm = {
-      id,
+      id, dbId: '',
       position: r.position,
       city: r.city,
       salary: r.salaryFrom ? String(r.salaryFrom) : '',
@@ -329,6 +359,7 @@ export function MyResume() {
       education: eduMap[r.education] ?? 'higher',
       workMode: workModeMap[r.workMode] ?? 'office',
       about: [r.about, r.skills.length ? `Навыки: ${r.skills.join(', ')}` : ''].filter(Boolean).join('\n\n'),
+      dbStatus: 'draft',
     };
     setResumes(prev => [...prev, newR]);
     setActive(id);
@@ -338,6 +369,35 @@ export function MyResume() {
     if (resumes.length === 1) return;
     setResumes(prev => prev.filter(r => r.id !== id));
     setActive(resumes.find(r => r.id !== id)?.id ?? 'r1');
+  };
+
+  const saveToDb = async (newStatus?: string) => {
+    if (!form.dbId) return;
+    setSaving(true);
+    try {
+      const body: Record<string, unknown> = {
+        position: form.position,
+        city: form.city,
+        salary: form.salary || null,
+        experience: form.experience,
+        education: form.education,
+        workMode: form.workMode,
+        about: form.about,
+      };
+      if (newStatus) body.status = newStatus;
+      const res = await fetch(`/api/resumes/${form.dbId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setResumes(prev => prev.map(r => r.id === active ? { ...r, dbStatus: data.status } : r));
+        setSaved(true);
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -406,10 +466,30 @@ export function MyResume() {
           />
         </div>
 
-        <div className="flex justify-end gap-2 items-center">
-          {saved && <span className="text-sm text-emerald-600">✓ Сохранено</span>}
-          <Btn variant="secondary">Предпросмотр</Btn>
-          <Btn variant="primary" onClick={() => setSaved(true)}>Сохранить изменения</Btn>
+        <div className="flex justify-between gap-2 items-center flex-wrap">
+          <div className="flex items-center gap-2">
+            {form.dbStatus && (
+              <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_COLORS[form.dbStatus] ?? 'text-slate-500 bg-slate-100'}`}>
+                {STATUS_LABELS[form.dbStatus] ?? form.dbStatus}
+              </span>
+            )}
+            {saved && <span className="text-sm text-emerald-600">✓ Сохранено</span>}
+          </div>
+          <div className="flex gap-2">
+            {form.dbId && form.dbStatus === 'draft' && (
+              <Btn variant="secondary" onClick={() => saveToDb('PENDING')} disabled={saving}>
+                Отправить на проверку
+              </Btn>
+            )}
+            {form.dbId && form.dbStatus === 'pending' && (
+              <Btn variant="ghost" onClick={() => saveToDb('DRAFT')} disabled={saving}>
+                Снять с проверки
+              </Btn>
+            )}
+            <Btn variant="primary" onClick={() => saveToDb()} disabled={saving || !form.dbId}>
+              {saving ? 'Сохранение…' : 'Сохранить изменения'}
+            </Btn>
+          </div>
         </div>
       </div>
     </div>

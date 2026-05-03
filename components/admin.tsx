@@ -1,14 +1,17 @@
 'use client';
 
-import { useState } from 'react';
-import type { Resume, Employer, Vacancy, AuditLog } from '@/lib/types';
+import { useState, useEffect } from 'react';
+import type { Resume, Employer, Vacancy, AuditLog, AdminStats } from '@/lib/types';
 import { ADMIN_STATS, DICTIONARIES, REGION_STATS } from '@/lib/mock-data';
 import { fmtDate, fmtDateTime, fmtSalary, fmtExp } from '@/lib/utils';
 import { Badge, Btn, Input, StatCard, StatusBadge, Avatar } from './ui';
 
 // ── Admin Dashboard ────────────────────────────────────────────────────────
 export function AdminDashboard({ logs }: { logs: AuditLog[] }) {
-  const s = ADMIN_STATS;
+  const [s, setS] = useState<AdminStats>(ADMIN_STATS);
+  useEffect(() => {
+    fetch('/api/admin/stats').then(r => r.json()).then(setS).catch(() => {});
+  }, []);
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-6">
@@ -90,8 +93,22 @@ export function AdminResumes({ resumes, setResumes }: {
     return true;
   });
 
-  const approve = (id: string) => setResumes(prev => prev.map(r => r.id === id ? { ...r, status: 'active' } : r));
-  const reject = (id: string) => setResumes(prev => prev.map(r => r.id === id ? { ...r, status: 'draft' } : r));
+  const approve = (id: string) => {
+    setResumes(prev => prev.map(r => r.id === id ? { ...r, status: 'active' } : r));
+    fetch(`/api/resumes/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'ACTIVE' }),
+    }).catch(() => {});
+  };
+  const reject = (id: string) => {
+    setResumes(prev => prev.map(r => r.id === id ? { ...r, status: 'draft' } : r));
+    fetch(`/api/resumes/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'REJECTED' }),
+    }).catch(() => {});
+  };
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -170,8 +187,22 @@ export function AdminEmployers({ employers, setEmployers }: {
     e.contactName.toLowerCase().includes(search.toLowerCase())
   );
 
-  const approve = (id: string) => setEmployers(prev => prev.map(e => e.id === id ? { ...e, status: 'approved' } : e));
-  const reject = (id: string) => setEmployers(prev => prev.map(e => e.id === id ? { ...e, status: 'pending' } : e));
+  const approve = (id: string) => {
+    setEmployers(prev => prev.map(e => e.id === id ? { ...e, status: 'approved' } : e));
+    fetch(`/api/employers/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'APPROVED' }),
+    }).catch(() => {});
+  };
+  const reject = (id: string) => {
+    setEmployers(prev => prev.map(e => e.id === id ? { ...e, status: 'pending' } : e));
+    fetch(`/api/employers/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'PENDING' }),
+    }).catch(() => {});
+  };
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -278,14 +309,16 @@ export function AdminVacancies({ vacancies, setVacancies }: {
 }
 
 // ── Admin Users ────────────────────────────────────────────────────────────
-export function AdminUsers({ employers }: { employers: Employer[] }) {
+type UserRow = { id: string; name: string; org: string; inn: string; email: string; role: string; isActive: boolean; createdAt: string };
+
+const ROLE_LABELS: Record<string, string> = { employer: 'Работодатель', seeker: 'Соискатель', admin: 'Администратор' };
+
+export function AdminUsers({ employers: _ }: { employers: Employer[] }) {
   const [search, setSearch] = useState('');
-  const users = [
-    ...employers.map(e => ({ id: e.id, name: e.contactName, org: e.name, email: e.email, role: 'Работодатель', status: e.status, date: e.registeredAt })),
-    { id: 'USR-001', name: 'Иванова Мария Сергеевна', org: '', email: 'maria@example.ru', role: 'Соискатель', status: 'approved', date: '2026-01-15' },
-    { id: 'USR-002', name: 'Петров Александр Иванович', org: '', email: 'petrov@example.ru', role: 'Соискатель', status: 'approved', date: '2026-02-03' },
-    { id: 'ADMIN', name: 'Администратор', org: 'ЗаказРФ', email: 'admin@zakaz.rf', role: 'Администратор', status: 'approved', date: '2025-01-01' },
-  ];
+  const [users, setUsers] = useState<UserRow[]>([]);
+  useEffect(() => {
+    fetch('/api/admin/users').then(r => r.json()).then(setUsers).catch(() => {});
+  }, []);
   const filtered = users.filter(u =>
     u.name.toLowerCase().includes(search.toLowerCase()) ||
     u.email.toLowerCase().includes(search.toLowerCase())
@@ -323,12 +356,14 @@ export function AdminUsers({ employers }: { employers: Employer[] }) {
                 <td className="px-4 py-3 text-slate-500 text-xs max-w-[160px] truncate">{u.org || '—'}</td>
                 <td className="px-4 py-3 text-slate-500 text-xs">{u.email}</td>
                 <td className="px-4 py-3">
-                  <Badge color={u.role === 'Администратор' ? 'purple' : u.role === 'Работодатель' ? 'blue' : 'cyan'}>
-                    {u.role}
+                  <Badge color={u.role === 'admin' ? 'purple' : u.role === 'employer' ? 'blue' : 'cyan'}>
+                    {ROLE_LABELS[u.role] ?? u.role}
                   </Badge>
                 </td>
-                <td className="px-4 py-3"><StatusBadge status={u.status} /></td>
-                <td className="px-4 py-3 text-slate-400 text-xs">{fmtDate(u.date)}</td>
+                <td className="px-4 py-3">
+                  <StatusBadge status={u.isActive ? 'approved' : 'pending'} />
+                </td>
+                <td className="px-4 py-3 text-slate-400 text-xs">{fmtDate(u.createdAt)}</td>
               </tr>
             ))}
           </tbody>
