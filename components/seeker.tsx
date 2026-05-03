@@ -90,8 +90,8 @@ type TestEntry = { value: string; passedAt: string };
 type ResumeFormFull = {
   dbId: string; dbStatus: string;
   firstName: string; lastName: string; patronymic: string; gender: string;
-  city: string; phone: string;
-  position: string; salary: string; workMode: string;
+  city: string; phone: string; email: string; photoUrl: string;
+  position: string; positionValid: boolean; salary: string; workMode: string;
   experience: string; education: string; educationInstitution: string; educationYears: string;
   workExperiences: WorkExpEntry[];
   activityAreas: string[]; skills: string[]; purchaseTypes: string[];
@@ -103,8 +103,8 @@ type ResumeFormFull = {
 const emptyForm = (): ResumeFormFull => ({
   dbId: '', dbStatus: 'draft',
   firstName: '', lastName: '', patronymic: '', gender: 'FEMALE',
-  city: '', phone: '',
-  position: '', salary: '', workMode: 'Офис',
+  city: '', phone: '', email: '', photoUrl: '',
+  position: '', positionValid: true, salary: '', workMode: 'Офис',
   experience: '0', education: 'Высшее', educationInstitution: '', educationYears: '',
   workExperiences: [],
   activityAreas: [], skills: [], purchaseTypes: [],
@@ -115,7 +115,7 @@ const emptyForm = (): ResumeFormFull => ({
 
 type DictOption = { id: string; value: string; label: string };
 
-function PositionAutocomplete({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function PositionAutocomplete({ value, valid, onChange, onValidChange }: { value: string; valid: boolean; onChange: (v: string) => void; onValidChange: (v: boolean) => void }) {
   const [positions, setPositions] = useState<DictOption[]>([]);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(value);
@@ -128,28 +128,40 @@ function PositionAutocomplete({ value, onChange }: { value: string; onChange: (v
   useEffect(() => { setQuery(value); }, [value]);
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        // on blur: if typed text doesn't match any option exactly → invalid
+        const matched = positions.find(p => p.label.toLowerCase() === query.toLowerCase());
+        if (query && !matched) { onValidChange(false); }
+      }
+    };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, []);
+  }, [query, positions, onValidChange]);
 
-  const filtered = positions.filter(p => p.label.toLowerCase().includes(query.toLowerCase()));
+  // startsWith filter (doc requirement), fallback to includes if no startsWith match
+  const startsWith = positions.filter(p => p.label.toLowerCase().startsWith(query.toLowerCase()));
+  const filtered = startsWith.length > 0 ? startsWith : positions.filter(p => p.label.toLowerCase().includes(query.toLowerCase()));
+
+  const isInvalid = !valid && query.length > 0;
 
   return (
     <div ref={ref} className="relative">
       <input
         value={query}
-        onChange={e => { setQuery(e.target.value); setOpen(true); }}
+        onChange={e => { setQuery(e.target.value); setOpen(true); onValidChange(false); onChange(e.target.value); }}
         onFocus={() => setOpen(true)}
         placeholder="Начните вводить должность..."
-        className="w-full rounded-lg border border-slate-200 bg-white text-sm text-slate-800 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className={`w-full rounded-lg border bg-white text-sm text-slate-800 px-3 py-2 focus:outline-none focus:ring-2 transition ${isInvalid ? 'border-red-400 focus:ring-red-400' : 'border-slate-200 focus:ring-blue-500'}`}
       />
+      {isInvalid && <p className="text-xs text-red-500 mt-1">Выберите должность из списка</p>}
       {open && filtered.length > 0 && (
         <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
           {filtered.map(p => (
             <button key={p.id} type="button"
               className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 transition"
-              onMouseDown={() => { onChange(p.label); setQuery(p.label); setOpen(false); }}>
+              onMouseDown={() => { onChange(p.label); setQuery(p.label); onValidChange(true); setOpen(false); }}>
               {p.label}
             </button>
           ))}
@@ -449,8 +461,8 @@ export function MyResume() {
           setForm({
             dbId: r.id, dbStatus: r.status,
             firstName: r.firstName, lastName: r.lastName, patronymic: r.patronymic ?? '', gender: r.gender,
-            city: r.city, phone: '',
-            position: r.position, salary: r.salary ? String(r.salary) : '', workMode: r.workMode,
+            city: r.city, phone: '', email: '', photoUrl: r.photo ?? '',
+            position: r.position, positionValid: true, salary: r.salary ? String(r.salary) : '', workMode: r.workMode,
             experience: String(r.experience), education: r.education,
             educationInstitution: r.educationInstitution ?? '', educationYears: r.educationYears ?? '',
             workExperiences: r.workExperiences.map(w => ({
@@ -472,7 +484,7 @@ export function MyResume() {
       })
       .catch(() => {});
     fetch('/api/users/me').then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setForm(f => ({ ...f, phone: d.phone ?? '' })); })
+      .then(d => { if (d) setForm(f => ({ ...f, phone: d.phone ?? '', email: d.email ?? '' })); })
       .catch(() => {});
   }, []);
 
@@ -480,12 +492,14 @@ export function MyResume() {
 
   const saveToDb = async (newStatus?: string) => {
     if (!form.dbId) return;
+    if (!form.positionValid && form.position) { upd('positionValid', false); return; }
     setSaving(true);
     try {
       const body: Record<string, unknown> = {
         firstName: form.firstName, lastName: form.lastName, patronymic: form.patronymic,
         gender: form.gender,
         position: form.position, city: form.city,
+        photoUrl: form.photoUrl || null,
         salary: form.salary || null, experience: form.experience,
         education: form.education, educationInstitution: form.educationInstitution,
         educationYears: form.educationYears, workMode: form.workMode, about: form.about,
@@ -588,9 +602,27 @@ export function MyResume() {
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
           <h3 className="text-sm font-semibold text-slate-800 mb-4">Общая информация</h3>
           <div className="flex gap-4 mb-4 items-start">
-            <div className="flex-shrink-0">
-              <Avatar name={[form.firstName, form.lastName].filter(Boolean).join(' ')} size="xl" />
-              <p className="text-xs text-slate-400 mt-1 text-center">Фото</p>
+            <div className="flex-shrink-0 flex flex-col items-center gap-1">
+              <label className="cursor-pointer group relative" title="Нажмите для загрузки фото">
+                {form.photoUrl
+                  ? <img src={form.photoUrl} alt="фото" className="w-24 h-24 rounded-full object-cover ring-2 ring-white shadow group-hover:brightness-90 transition" />
+                  : <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-3xl font-semibold ring-2 ring-white shadow group-hover:brightness-90 transition">
+                      {[form.firstName, form.lastName].filter(Boolean).map(w => w[0]).join('') || '?'}
+                    </div>
+                }
+                <div className="absolute inset-0 rounded-full flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition">
+                  <span className="text-white text-xs font-medium">Загрузить</span>
+                </div>
+                <input type="file" accept="image/*" className="hidden" onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 2 * 1024 * 1024) { alert('Файл слишком большой. Максимум 2 МБ.'); return; }
+                  const reader = new FileReader();
+                  reader.onload = ev => { upd('photoUrl', ev.target?.result as string); };
+                  reader.readAsDataURL(file);
+                }} />
+              </label>
+              <p className="text-xs text-slate-400">Фото</p>
             </div>
             <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -623,7 +655,7 @@ export function MyResume() {
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Email</label>
-              <Input value="" onChange={() => {}} disabled placeholder="из профиля" />
+              <Input value={form.email} onChange={() => {}} disabled placeholder="из профиля" />
             </div>
           </div>
         </div>
@@ -633,7 +665,8 @@ export function MyResume() {
           <h3 className="text-sm font-semibold text-slate-800 mb-4">Требования к работе</h3>
           <div className="mb-3">
             <label className="text-xs font-medium text-slate-600 mb-1 block">Желаемая должность</label>
-            <PositionAutocomplete value={form.position} onChange={v => upd('position', v)} />
+            <PositionAutocomplete value={form.position} valid={form.positionValid}
+              onChange={v => upd('position', v)} onValidChange={v => upd('positionValid', v)} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>

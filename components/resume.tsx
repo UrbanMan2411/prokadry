@@ -245,7 +245,8 @@ export function ResumeDetail({
   const [invOpen, setInvOpen] = useState(false);
 
   if (!resume) return null;
-  const hasSVO = resume.specialStatuses.some(s => s.confirmed || s.value === 'svo_participant' || s.value === 'disabled');
+  const confirmedStatuses = resume.specialStatuses.filter(s => s.confirmed);
+  const hasSVO = confirmedStatuses.length > 0;
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -282,7 +283,7 @@ export function ResumeDetail({
                 </div>
                 {hasSVO && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {resume.specialStatuses.map(s => (
+                    {confirmedStatuses.map(s => (
                       <span key={s.value} className="inline-flex items-center gap-1.5 px-3 py-1 bg-cyan-50 text-cyan-700 text-xs font-semibold rounded-full ring-1 ring-cyan-200">
                         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />

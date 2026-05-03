@@ -85,6 +85,7 @@ export function AdminResumes({ resumes, setResumes }: {
 }) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const filtered = resumes.filter(r => {
     if (statusFilter && r.status !== statusFilter) return false;
@@ -95,18 +96,21 @@ export function AdminResumes({ resumes, setResumes }: {
 
   const approve = (id: string) => {
     setResumes(prev => prev.map(r => r.id === id ? { ...r, status: 'active' } : r));
-    fetch(`/api/resumes/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'ACTIVE' }),
-    }).catch(() => {});
+    fetch(`/api/resumes/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'ACTIVE' }) }).catch(() => {});
   };
   const reject = (id: string) => {
     setResumes(prev => prev.map(r => r.id === id ? { ...r, status: 'draft' } : r));
-    fetch(`/api/resumes/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'REJECTED' }),
+    fetch(`/api/resumes/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'REJECTED' }) }).catch(() => {});
+  };
+
+  const confirmStatus = (resumeId: string, value: string, confirmed: boolean) => {
+    setResumes(prev => prev.map(r => r.id === resumeId ? {
+      ...r,
+      specialStatuses: r.specialStatuses.map(s => s.value === value ? { ...s, confirmed } : s),
+    } : r));
+    fetch(`/api/resumes/${resumeId}/confirm-status`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value, confirmed }),
     }).catch(() => {});
   };
 
@@ -144,31 +148,51 @@ export function AdminResumes({ resumes, setResumes }: {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filtered.map(r => (
-              <tr key={r.id} className="hover:bg-slate-50 transition">
-                <td className="px-3 py-3"><Avatar src={r.photo} name={r.fullName} size="sm" /></td>
-                <td className="px-3 py-3 font-mono text-xs text-slate-400">{r.id}</td>
-                <td className="px-3 py-3 font-medium text-slate-800">{r.fullName.split(' ').slice(0, 2).join(' ')}</td>
-                <td className="px-3 py-3 text-slate-600 max-w-[180px] truncate">{r.position}</td>
-                <td className="px-3 py-3 text-slate-500">{r.city}</td>
-                <td className="px-3 py-3 text-slate-500">{fmtExp(r.experience)}</td>
-                <td className="px-3 py-3"><StatusBadge status={r.status} /></td>
-                <td className="px-3 py-3 text-slate-400 text-xs">{fmtDate(r.publishedAt)}</td>
-                <td className="px-3 py-3">
-                  <div className="flex gap-1.5">
-                    {r.status === 'pending' && (
-                      <>
-                        <Btn size="xs" variant="primary" onClick={() => approve(r.id)}>Одобрить</Btn>
-                        <Btn size="xs" variant="danger" onClick={() => reject(r.id)}>Отклонить</Btn>
-                      </>
-                    )}
-                    {r.status !== 'pending' && (
-                      <Btn size="xs" variant="ghost" onClick={() => setResumes(prev => prev.map(x => x.id === r.id ? { ...x, status: 'pending' } : x))}>
-                        На проверку
-                      </Btn>
-                    )}
-                  </div>
-                </td>
-              </tr>
+              <>
+                <tr key={r.id} className="hover:bg-slate-50 transition">
+                  <td className="px-3 py-3"><Avatar src={r.photo} name={r.fullName} size="sm" /></td>
+                  <td className="px-3 py-3 font-mono text-xs text-slate-400">{r.id.slice(0, 8)}…</td>
+                  <td className="px-3 py-3 font-medium text-slate-800">{r.fullName.split(' ').slice(0, 2).join(' ')}</td>
+                  <td className="px-3 py-3 text-slate-600 max-w-[180px] truncate">{r.position}</td>
+                  <td className="px-3 py-3 text-slate-500">{r.city}</td>
+                  <td className="px-3 py-3 text-slate-500">{fmtExp(r.experience)}</td>
+                  <td className="px-3 py-3"><StatusBadge status={r.status} /></td>
+                  <td className="px-3 py-3 text-slate-400 text-xs">{fmtDate(r.publishedAt)}</td>
+                  <td className="px-3 py-3">
+                    <div className="flex gap-1.5 flex-wrap">
+                      {r.status !== 'active' && <Btn size="xs" variant="primary" onClick={() => approve(r.id)}>Одобрить</Btn>}
+                      {r.status === 'active' && <Btn size="xs" variant="danger" onClick={() => reject(r.id)}>Отклонить</Btn>}
+                      {r.specialStatuses.length > 0 && (
+                        <Btn size="xs" variant="ghost" onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}>
+                          Статусы {r.specialStatuses.some(s => !s.confirmed) ? '⚠' : '✓'}
+                        </Btn>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+                {expandedId === r.id && r.specialStatuses.length > 0 && (
+                  <tr key={`${r.id}-expand`} className="bg-amber-50">
+                    <td colSpan={9} className="px-6 py-3">
+                      <div className="text-xs font-semibold text-slate-600 mb-2">Особые статусы — требуют подтверждения:</div>
+                      <div className="flex flex-wrap gap-3">
+                        {r.specialStatuses.map(s => (
+                          <div key={s.value} className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2">
+                            <span className={`text-xs font-medium ${s.confirmed ? 'text-emerald-700' : 'text-amber-700'}`}>
+                              {s.confirmed ? '✓' : '⏳'} {s.label}
+                            </span>
+                            {s.docDate && <span className="text-xs text-slate-400">от {s.docDate}</span>}
+                            {s.docNumber && <span className="text-xs text-slate-400">№{s.docNumber}</span>}
+                            {!s.confirmed
+                              ? <Btn size="xs" variant="primary" onClick={() => confirmStatus(r.id, s.value, true)}>Подтвердить</Btn>
+                              : <Btn size="xs" variant="ghost" onClick={() => confirmStatus(r.id, s.value, false)}>Снять</Btn>
+                            }
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </>
             ))}
           </tbody>
         </table>

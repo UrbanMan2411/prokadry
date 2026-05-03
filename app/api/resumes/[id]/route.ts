@@ -22,6 +22,7 @@ export async function PATCH(
 
       const {
         firstName, lastName, patronymic, gender,
+        photoUrl,
         position, city, salary, experience,
         education, educationInstitution, educationYears,
         workMode, about, status,
@@ -39,6 +40,7 @@ export async function PATCH(
       if (lastName !== undefined) data.lastName = lastName;
       if (patronymic !== undefined) data.patronymic = patronymic || null;
       if (gender !== undefined && ['MALE', 'FEMALE'].includes(String(gender).toUpperCase())) data.gender = String(gender).toUpperCase();
+      if (photoUrl !== undefined) { data.photoUrl = photoUrl || null; data.hasPhoto = !!photoUrl; }
       if (position !== undefined) data.position = position;
       if (city !== undefined) data.city = city;
       if (salary !== undefined) data.salary = salary ? Number(salary) : null;
