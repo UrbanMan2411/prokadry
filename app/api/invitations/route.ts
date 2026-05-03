@@ -64,10 +64,49 @@ export async function GET(_req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
-    if (!session || session.role !== 'EMPLOYER') {
+    if (!session || (session.role !== 'EMPLOYER' && session.role !== 'SEEKER')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    if (session.role === 'SEEKER') {
+      const resume = await db.resume.findUnique({
+        where: { userId: session.userId },
+        select: { id: true },
+      });
+      if (!resume) return NextResponse.json({ error: 'Resume not found' }, { status: 404 });
+
+      const { vacancyId } = await req.json();
+      if (!vacancyId) return NextResponse.json({ error: 'Missing vacancyId' }, { status: 400 });
+
+      const vacancy = await db.vacancy.findUnique({
+        where: { id: vacancyId },
+        include: { employer: { select: { name: true } } },
+      });
+      if (!vacancy) return NextResponse.json({ error: 'Vacancy not found' }, { status: 404 });
+
+      const row = await db.invitation.create({
+        data: { resumeId: resume.id, vacancyId, message: 'Отклик соискателя', status: 'SENT' },
+        include: {
+          resume: { select: { firstName: true, lastName: true } },
+          vacancy: { select: { title: true, employer: { select: { name: true } } } },
+        },
+      });
+
+      const inv: Invitation = {
+        id: row.id,
+        resumeId: row.resumeId,
+        vacancyId: row.vacancyId,
+        candidateName: `${row.resume.firstName} ${row.resume.lastName}`.trim(),
+        vacancyTitle: row.vacancy.title,
+        employerName: row.vacancy.employer.name,
+        message: row.message,
+        status: row.status.toLowerCase() as Invitation['status'],
+        createdAt: row.sentAt.toISOString(),
+      };
+      return NextResponse.json(inv, { status: 201 });
+    }
+
+    // EMPLOYER path
     const emp = await db.employer.findUnique({
       where: { userId: session.userId },
       select: { id: true },

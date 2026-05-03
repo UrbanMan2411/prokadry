@@ -1124,6 +1124,21 @@ export function SeekerVacancyRegistry({ vacancies }: { vacancies: Vacancy[] }) {
   const [sphere, setSphere] = useState('');
   const [activity, setActivity] = useState('');
   const [workMode, setWorkMode] = useState('');
+  const [applyStatus, setApplyStatus] = useState<Record<string, 'loading' | 'done' | 'error'>>({});
+
+  const handleApply = async (vacancyId: string) => {
+    setApplyStatus(prev => ({ ...prev, [vacancyId]: 'loading' }));
+    try {
+      const res = await fetch('/api/invitations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vacancyId }),
+      });
+      setApplyStatus(prev => ({ ...prev, [vacancyId]: res.ok || res.status === 409 ? 'done' : 'error' }));
+    } catch {
+      setApplyStatus(prev => ({ ...prev, [vacancyId]: 'error' }));
+    }
+  };
 
   const active = vacancies.filter(v => v.status === 'active').filter(v => {
     if (search && !v.title.toLowerCase().includes(search.toLowerCase()) &&
@@ -1190,7 +1205,14 @@ export function SeekerVacancyRegistry({ vacancies }: { vacancies: Vacancy[] }) {
               </div>
               <div className="text-right flex-shrink-0">
                 <div className="font-bold text-slate-800 text-sm whitespace-nowrap">{fmtSalary(v.salaryFrom)}</div>
-                <Btn variant="primary" size="sm" onClick={() => {}}>Откликнуться</Btn>
+                <Btn
+                  variant={applyStatus[v.id] === 'done' ? 'secondary' : 'primary'}
+                  size="sm"
+                  disabled={!!applyStatus[v.id]}
+                  onClick={() => handleApply(v.id)}
+                >
+                  {applyStatus[v.id] === 'loading' ? '...' : applyStatus[v.id] === 'done' ? 'Отклик отправлен' : applyStatus[v.id] === 'error' ? 'Ошибка' : 'Откликнуться'}
+                </Btn>
               </div>
             </div>
           </div>
@@ -1204,6 +1226,21 @@ export function SeekerVacancyRegistry({ vacancies }: { vacancies: Vacancy[] }) {
 export function SeekerMapSearch({ vacancies }: { vacancies: Vacancy[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [selectedCity, setSelectedCity] = useState<MapCity | null>(null);
+  const [applyStatus, setApplyStatus] = useState<Record<string, 'loading' | 'done' | 'error'>>({});
+
+  const handleApply = async (vacancyId: string) => {
+    setApplyStatus(prev => ({ ...prev, [vacancyId]: 'loading' }));
+    try {
+      const res = await fetch('/api/invitations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vacancyId }),
+      });
+      setApplyStatus(prev => ({ ...prev, [vacancyId]: res.ok || res.status === 409 ? 'done' : 'error' }));
+    } catch {
+      setApplyStatus(prev => ({ ...prev, [vacancyId]: 'error' }));
+    }
+  };
 
   const cityVacs = vacancies.filter(v => v.status === 'active').reduce<Record<string, number>>((acc, v) => {
     acc[v.city] = (acc[v.city] ?? 0) + 1;
@@ -1263,7 +1300,14 @@ export function SeekerMapSearch({ vacancies }: { vacancies: Vacancy[] }) {
                 </div>
                 <div className="text-right flex-shrink-0">
                   <div className="text-sm font-semibold text-slate-700">{fmtSalary(v.salaryFrom)}</div>
-                  <Btn variant="primary" size="sm" onClick={() => {}}>Откликнуться</Btn>
+                  <Btn
+                    variant={applyStatus[v.id] === 'done' ? 'secondary' : 'primary'}
+                    size="sm"
+                    disabled={!!applyStatus[v.id]}
+                    onClick={() => handleApply(v.id)}
+                  >
+                    {applyStatus[v.id] === 'loading' ? '...' : applyStatus[v.id] === 'done' ? 'Отклик отправлен' : applyStatus[v.id] === 'error' ? 'Ошибка' : 'Откликнуться'}
+                  </Btn>
                 </div>
               </div>
             ))}

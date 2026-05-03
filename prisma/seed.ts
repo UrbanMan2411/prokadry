@@ -120,13 +120,13 @@ async function main() {
       isActive: true,
       employer: {
         create: {
-          name: 'ООО «ТехноЗакупки»',
-          inn: '7700000001',
+          name: 'ООО «Демо Закупки»',
+          inn: '0000000000',
           region: 'Москва',
           city: 'Москва',
-          contactName: 'Алексей Иванов',
+          contactName: 'Демо Пользователь',
           phone: '+7 (900) 000-00-01',
-          description: 'Ведущий поставщик IT-решений для государственных закупок по 44-ФЗ и 223-ФЗ.',
+          description: 'Демонстрационная учётная запись работодателя.',
           status: 'APPROVED',
         },
       },
@@ -144,8 +144,8 @@ async function main() {
       isActive: true,
       resume: {
         create: {
-          firstName: 'Мария',
-          lastName: 'Петрова',
+          firstName: 'Демо',
+          lastName: 'Соискатель',
           gender: 'FEMALE',
           birthDate: new Date('1992-05-15'),
           city: 'Москва',

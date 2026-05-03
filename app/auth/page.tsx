@@ -256,14 +256,14 @@ function EmployerForm() {
         </div>
 
         <div className="sm:col-span-2">
-          <Field label="Название организации" name="name" placeholder='ООО «ТехноСервис»' error={errs.name}
+          <Field label="Название организации" name="name" placeholder='ООО «Название»' error={errs.name}
             value={orgName} onChange={v => { setOrgName(v); setInnFilled(false); }} autoComplete="organization" verified={innFilled && !!orgName} />
         </div>
         <Field label="Регион" name="region" placeholder="Москва" error={errs.region}
           value={region} onChange={v => { setRegion(v); setInnFilled(false); }} autoComplete="address-level1" verified={innFilled && !!region} />
         <Field label="Город" name="city" placeholder="Москва" error={errs.city}
           value={city} onChange={v => { setCity(v); setInnFilled(false); }} autoComplete="address-level2" verified={innFilled && !!city} />
-        <Field label="Контактное лицо" name="contactName" placeholder="Иванов Алексей" error={errs.contactName} autoComplete="name" />
+        <Field label="Контактное лицо" name="contactName" placeholder="Фамилия Имя" error={errs.contactName} autoComplete="name" />
         <div className="sm:col-span-2">
           <Field label="Телефон" name="phone" type="tel" placeholder="+7 (900) 000-00-00" error={errs.phone} autoComplete="tel" />
         </div>
@@ -294,8 +294,8 @@ function SeekerForm() {
         </div>
         <PasswordField label="Пароль" name="password" placeholder="Минимум 6 символов" error={errs.password} autoComplete="new-password" />
         <PasswordField label="Повторите пароль" name="confirm" placeholder="••••••••" error={errs.confirm} autoComplete="new-password" />
-        <Field label="Фамилия" name="lastName" placeholder="Иванова" error={errs.lastName} autoComplete="family-name" />
-        <Field label="Имя" name="firstName" placeholder="Мария" error={errs.firstName} autoComplete="given-name" />
+        <Field label="Фамилия" name="lastName" placeholder="Фамилия" error={errs.lastName} autoComplete="family-name" />
+        <Field label="Имя" name="firstName" placeholder="Имя" error={errs.firstName} autoComplete="given-name" />
 
         {/* Gender */}
         <div className="sm:col-span-2">
@@ -431,10 +431,10 @@ function LeftPanel() {
             Нашли контрактного управляющего за 3 дня. Платформа знает специфику 44-ФЗ — не нужно объяснять что такое ЕИС.
           </p>
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-blue-400/30 border border-blue-300/20 flex items-center justify-center text-xs text-white font-bold shrink-0">АМ</div>
+            <div className="w-8 h-8 rounded-full bg-blue-400/30 border border-blue-300/20 flex items-center justify-center text-xs text-white font-bold shrink-0">ЕК</div>
             <div>
-              <div className="text-white text-xs font-semibold">Анна М.</div>
-              <div className="text-blue-300 text-xs">HR-директор, ООО «ТехноСервис»</div>
+              <div className="text-white text-xs font-semibold">Е. К.</div>
+              <div className="text-blue-300 text-xs">Начальник отдела закупок</div>
             </div>
           </div>
         </div>
