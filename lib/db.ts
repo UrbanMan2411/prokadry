@@ -20,9 +20,11 @@ function resolveWritableDatabaseUrl() {
     const src = path.resolve(process.cwd(), dbUrl.replace(/^file:/, '').replace(/^\.\//, ''));
 
     if (fs.existsSync(src)) {
-      if (!fs.existsSync(tmpDb)) {
+      const srcMtime = fs.statSync(src).mtimeMs;
+      const tmpMtime = fs.existsSync(tmpDb) ? fs.statSync(tmpDb).mtimeMs : 0;
+      if (tmpMtime < srcMtime) {
         fs.copyFileSync(src, tmpDb);
-        console.log('[db] Copied demo DB to', tmpDb);
+        console.log('[db] Copied/refreshed DB to', tmpDb);
       }
       return `file:${tmpDb}`;
     }
