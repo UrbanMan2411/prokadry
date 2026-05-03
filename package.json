@@ -9,7 +9,8 @@
     "lint": "eslint",
     "seed": "tsx scripts/seed-resumes.ts",
     "scrape:resumes": "python scrapers/resume_scraper.py",
-    "import:scraped-resumes": "tsx scripts/import-scraped-resumes.ts"
+    "import:scraped-resumes": "tsx scripts/import-scraped-resumes.ts",
+    "clear-db": "tsx scripts/clear-seeded-resumes.ts"
   },
   "dependencies": {
     "@2gis/mapgl": "^1.72.0",

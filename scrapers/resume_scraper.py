@@ -4,14 +4,16 @@ Scrape resume cards/details from hh.ru and Avito with Scrapling and export
 normalized records for the Prisma importer.
 
 Examples:
-  python scrapers/resume_scraper.py --source avito --query "специалист по закупкам" --limit 20 --out data/imports/avito.jsonl --fetcher stealthy
-  python scrapers/resume_scraper.py --source hh --query "специалист по закупкам" --limit 20 --out data/imports/hh.jsonl --fetcher dynamic
+  python scrapers/resume_scraper.py --source avito --query "специалист по закупкам" --limit 50 --out data/imports/avito.jsonl --fetcher stealthy
+  python scrapers/resume_scraper.py --source hh --query "специалист по закупкам" --limit 50 --out data/imports/hh.jsonl --fetcher stealthy
+  python scrapers/resume_scraper.py --source avito --query "контрактный управляющий" --limit 50 --out data/imports/avito2.jsonl --fetcher stealthy --headful
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import random
 import re
 import sys
@@ -22,11 +24,18 @@ from pathlib import Path
 from typing import Iterable
 from urllib.parse import quote_plus, urljoin
 
+# Set playwright browsers path so patchright finds installed Chromium
+_BROWSERS_PATH = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ms-playwright")
+if not os.path.isdir(_BROWSERS_PATH):
+    _BROWSERS_PATH = r"C:\playwright-browsers"
+if os.path.isdir(_BROWSERS_PATH):
+    os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", _BROWSERS_PATH)
+
 try:
     from scrapling.fetchers import DynamicFetcher, Fetcher, StealthyFetcher
 except ImportError as exc:
     raise SystemExit(
-        "Scrapling is not installed. Run: python -m pip install -r scrapers/requirements.txt"
+        "Scrapling is not installed. Run: pip install 'scrapling[all]'"
     ) from exc
 
 
@@ -34,6 +43,8 @@ AVITO_BASE = "https://www.avito.ru"
 AVITO_SEARCH = f"{AVITO_BASE}/rossiya/vakansii_i_rezume/rezume"
 HH_BASE = "https://hh.ru"
 HH_SEARCH = f"{HH_BASE}/search/resume"
+
+CHROME_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 
 CITY_REGION = {
     "Москва": "Москва",
@@ -111,9 +122,49 @@ def selector_all_text(node: object, *selectors: str) -> list[str]:
     return out
 
 
-def fetch_page(url: str, fetcher: str, *, headless: bool, wait: float):
+def _accept_avito_cookies(page: object) -> None:
+    """page_action callback: accept Avito cookie consent if shown."""
+    try:
+        btn = page.query_selector('[data-marker="cookie-alert/button"]')
+        if btn:
+            btn.click()
+            page.wait_for_timeout(1000)
+    except Exception:
+        pass
+
+
+def _accept_hh_cookies(page: object) -> None:
+    """page_action callback: accept hh.ru cookie consent if shown."""
+    try:
+        for sel in ['[data-qa="cookie-agreement-button"]', 'button[class*="cookie"]']:
+            btn = page.query_selector(sel)
+            if btn:
+                btn.click()
+                page.wait_for_timeout(1000)
+                break
+    except Exception:
+        pass
+
+
+def _build_stealthy_kwargs(source: str, headless: bool, use_chrome: bool) -> dict:
+    kwargs: dict = {
+        "headless": headless,
+        "network_idle": True,
+        "block_ads": True,
+        "locale": "ru-RU",
+        "timezone_id": "Europe/Moscow",
+        "retries": 2,
+        "page_action": _accept_avito_cookies if source == "avito" else _accept_hh_cookies,
+    }
+    if use_chrome and os.path.isfile(CHROME_PATH):
+        kwargs["real_chrome"] = True
+        kwargs["executable_path"] = CHROME_PATH
+    return kwargs
+
+
+def fetch_page(url: str, fetcher: str, *, source: str, headless: bool, wait: float, use_chrome: bool = False):
     if wait > 0:
-        time.sleep(wait + random.random())
+        time.sleep(wait + random.random() * 0.5)
 
     if fetcher == "fetch":
         return Fetcher.get(url, impersonate="chrome", stealthy_headers=True)
@@ -124,15 +175,13 @@ def fetch_page(url: str, fetcher: str, *, headless: bool, wait: float):
             headless=headless,
             network_idle=True,
             block_ads=True,
+            locale="ru-RU",
+            page_action=_accept_avito_cookies if source == "avito" else _accept_hh_cookies,
+            **({"executable_path": CHROME_PATH} if use_chrome and os.path.isfile(CHROME_PATH) else {}),
         )
 
     if fetcher == "stealthy":
-        return StealthyFetcher.fetch(
-            url,
-            headless=headless,
-            network_idle=True,
-            block_ads=True,
-        )
+        return StealthyFetcher.fetch(url, **_build_stealthy_kwargs(source, headless, use_chrome))
 
     raise ValueError(f"Unknown fetcher: {fetcher}")
 
@@ -225,15 +274,23 @@ def hh_search_url(query: str, page: int) -> str:
 
 def extract_avito_cards(page: object) -> list[dict]:
     cards = []
-    for selector in ['[data-marker="item"]', 'article[data-item-id]', '[class*="iva-item-root"]']:
+    # Try multiple selector strategies
+    for item_sel in [
+        '[data-marker="item"]',
+        'article[data-item-id]',
+        '[class*="iva-item-root"]',
+        '[class*="item-root_"]',
+        'div[data-item-id]',
+    ]:
         try:
-            nodes = page.css(selector)
+            nodes = page.css(item_sel)
         except Exception:
             nodes = []
         for node in nodes:
             href = selector_text(
                 node,
                 'a[href*="/vakansii_i_rezume/"]::attr(href)',
+                'a[href*="/rezume/"]::attr(href)',
                 'a::attr(href)',
             )
             title = selector_text(
@@ -245,16 +302,18 @@ def extract_avito_cards(page: object) -> list[dict]:
             )
             if not href or not title:
                 continue
-            source_id = selector_text(node, "::attr(data-item-id)") or href.split("_")[-1].split("?")[0]
-            cards.append(
-                {
-                    "source_id": source_id,
-                    "url": urljoin(AVITO_BASE, href),
-                    "title": title,
-                    "city": selector_text(node, '[data-marker="item-location"]::text', '[class*="geo"]::text'),
-                    "salary": selector_text(node, '[data-marker="item-price"]::text', '[class*="price"]::text'),
-                }
+            source_id = (
+                selector_text(node, "::attr(data-item-id)")
+                or selector_text(node, "article::attr(data-item-id)")
+                or href.rstrip("/").split("_")[-1].split("?")[0]
             )
+            cards.append({
+                "source_id": source_id,
+                "url": urljoin(AVITO_BASE, href),
+                "title": title,
+                "city": selector_text(node, '[data-marker="item-location"]::text', '[class*="geo"]::text'),
+                "salary": selector_text(node, '[data-marker="item-price"]::text', '[class*="price"]::text'),
+            })
         if cards:
             break
     return dedupe_by_url(cards)
@@ -262,26 +321,43 @@ def extract_avito_cards(page: object) -> list[dict]:
 
 def extract_hh_cards(page: object) -> list[dict]:
     cards = []
-    for selector in ['[data-qa="resume-serp__resume"]', '[data-qa*="resume"]', ".resume-search-item"]:
+    for selector in [
+        '[data-qa="resume-serp__resume"]',
+        '[data-qa*="resume"]',
+        ".resume-search-item",
+        '[class*="resumeCard"]',
+    ]:
         try:
             nodes = page.css(selector)
         except Exception:
             nodes = []
         for node in nodes:
             href = selector_text(node, 'a[href*="/resume/"]::attr(href)', "a::attr(href)")
-            title = selector_text(node, '[data-qa="resume-serp__resume-title"]::text', "h3::text", "a::text")
+            title = selector_text(
+                node,
+                '[data-qa="resume-serp__resume-title"]::text',
+                '[data-qa*="resume-title"]::text',
+                "h3::text",
+                "a::text",
+            )
             if not href or not title:
                 continue
             source_id = href.rstrip("/").split("/")[-1].split("?")[0]
-            cards.append(
-                {
-                    "source_id": source_id,
-                    "url": urljoin(HH_BASE, href),
-                    "title": title,
-                    "city": selector_text(node, '[data-qa="resume-serp__resume-address"]::text', '[data-qa*="address"]::text'),
-                    "salary": selector_text(node, '[data-qa="resume-serp__resume-compensation"]::text', '[data-qa*="salary"]::text'),
-                }
-            )
+            cards.append({
+                "source_id": source_id,
+                "url": urljoin(HH_BASE, href),
+                "title": title,
+                "city": selector_text(
+                    node,
+                    '[data-qa="resume-serp__resume-address"]::text',
+                    '[data-qa*="address"]::text',
+                ),
+                "salary": selector_text(
+                    node,
+                    '[data-qa="resume-serp__resume-compensation"]::text',
+                    '[data-qa*="salary"]::text',
+                ),
+            })
         if cards:
             break
     return dedupe_by_url(cards)
@@ -300,11 +376,34 @@ def dedupe_by_url(cards: list[dict]) -> list[dict]:
 
 
 def parse_avito_detail(page: object, card: dict) -> ResumeRecord:
-    position = selector_text(page, '[data-marker="page-title/title"]::text', "h1::text") or card["title"]
-    city = selector_text(page, '[data-marker="delivery-location"]::text', '[itemprop="addressLocality"]::text') or card["city"]
-    salary = selector_text(page, '[data-marker="price-value"]::text', '[itemprop="price"]::text') or card["salary"]
-    about = selector_text(page, '[data-marker="item-description/text"]::text', '[itemprop="description"]::text', '[class*="description"]::text')
-    skills = selector_all_text(page, '[data-marker*="tag"]::text', '[class*="params"]::text', '[class*="tag"]::text')
+    position = (
+        selector_text(page, '[data-marker="page-title/title"]::text', "h1::text")
+        or card["title"]
+    )
+    city = (
+        selector_text(
+            page,
+            '[data-marker="delivery-location"]::text',
+            '[itemprop="addressLocality"]::text',
+        )
+        or card["city"]
+    )
+    salary = (
+        selector_text(page, '[data-marker="price-value"]::text', '[itemprop="price"]::text')
+        or card["salary"]
+    )
+    about = selector_text(
+        page,
+        '[data-marker="item-description/text"]::text',
+        '[itemprop="description"]::text',
+        '[class*="description"]::text',
+    )
+    skills = selector_all_text(
+        page,
+        '[data-marker*="tag"]::text',
+        '[class*="params"]::text',
+        '[class*="tag"]::text',
+    )
     return make_record(
         source="avito",
         source_id=card["source_id"],
@@ -318,13 +417,42 @@ def parse_avito_detail(page: object, card: dict) -> ResumeRecord:
 
 
 def parse_hh_detail(page: object, card: dict) -> ResumeRecord:
-    position = selector_text(page, '[data-qa="resume-block-title-position"]::text', "h1::text") or card["title"]
-    name = selector_text(page, '[data-qa="resume-personal-name"]::text', '[data-qa*="resume-personal"]::text')
-    city = selector_text(page, '[data-qa="resume-personal-address"]::text', '[data-qa*="address"]::text') or card["city"]
-    salary = selector_text(page, '[data-qa="resume-block-salary"]::text', '[data-qa*="salary"]::text') or card["salary"]
-    experience = selector_text(page, '[data-qa="resume-block-experience"]::text', '[data-qa*="experience"]::text')
-    about = selector_text(page, '[data-qa="resume-block-skills-content"]::text', '[data-qa="resume-block-about"]::text')
-    skills = selector_all_text(page, '[data-qa="bloko-tag__text"]::text', '[data-qa*="skill"]::text')
+    position = (
+        selector_text(page, '[data-qa="resume-block-title-position"]::text', "h1::text")
+        or card["title"]
+    )
+    name = selector_text(
+        page,
+        '[data-qa="resume-personal-name"]::text',
+        '[data-qa*="resume-personal"]::text',
+    )
+    city = (
+        selector_text(
+            page,
+            '[data-qa="resume-personal-address"]::text',
+            '[data-qa*="address"]::text',
+        )
+        or card["city"]
+    )
+    salary = (
+        selector_text(page, '[data-qa="resume-block-salary"]::text', '[data-qa*="salary"]::text')
+        or card["salary"]
+    )
+    experience = selector_text(
+        page,
+        '[data-qa="resume-block-experience"]::text',
+        '[data-qa*="experience"]::text',
+    )
+    about = selector_text(
+        page,
+        '[data-qa="resume-block-skills-content"]::text',
+        '[data-qa="resume-block-about"]::text',
+    )
+    skills = selector_all_text(
+        page,
+        '[data-qa="bloko-tag__text"]::text',
+        '[data-qa*="skill"]::text',
+    )
     return make_record(
         source="hh",
         source_id=card["source_id"],
@@ -338,16 +466,34 @@ def parse_hh_detail(page: object, card: dict) -> ResumeRecord:
     )
 
 
-def collect(source: str, query: str, limit: int, fetcher: str, headless: bool, wait: float) -> list[ResumeRecord]:
+def collect(
+    source: str,
+    query: str,
+    limit: int,
+    fetcher: str,
+    headless: bool,
+    wait: float,
+    use_chrome: bool,
+) -> list[ResumeRecord]:
     records: list[ResumeRecord] = []
     page_no = 1
     while len(records) < limit and page_no <= 10:
         search_url = avito_search_url(query, page_no) if source == "avito" else hh_search_url(query, page_no)
-        print(f"[scrape] search {search_url}", file=sys.stderr)
-        search_page = fetch_page(search_url, fetcher, headless=headless, wait=wait if page_no > 1 else 0)
+        print(f"[scrape] search page {page_no}: {search_url}", file=sys.stderr)
+        try:
+            search_page = fetch_page(
+                search_url, fetcher,
+                source=source, headless=headless,
+                wait=wait if page_no > 1 else 0,
+                use_chrome=use_chrome,
+            )
+        except Exception as exc:
+            print(f"[scrape] search page error: {exc}", file=sys.stderr)
+            break
+
         cards = extract_avito_cards(search_page) if source == "avito" else extract_hh_cards(search_page)
+        print(f"[scrape] found {len(cards)} cards on page {page_no}", file=sys.stderr)
         if not cards:
-            print(f"[scrape] no cards on page {page_no}", file=sys.stderr)
             break
 
         for card in cards:
@@ -355,8 +501,16 @@ def collect(source: str, query: str, limit: int, fetcher: str, headless: bool, w
                 break
             try:
                 print(f"[scrape] detail {card['url']}", file=sys.stderr)
-                detail_page = fetch_page(card["url"], fetcher, headless=headless, wait=wait)
-                record = parse_avito_detail(detail_page, card) if source == "avito" else parse_hh_detail(detail_page, card)
+                detail_page = fetch_page(
+                    card["url"], fetcher,
+                    source=source, headless=headless,
+                    wait=wait, use_chrome=use_chrome,
+                )
+                record = (
+                    parse_avito_detail(detail_page, card)
+                    if source == "avito"
+                    else parse_hh_detail(detail_page, card)
+                )
                 records.append(record)
             except Exception as exc:
                 print(f"[scrape] skipped {card['url']}: {exc}", file=sys.stderr)
@@ -375,11 +529,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Scrape resumes with Scrapling and export JSONL.")
     parser.add_argument("--source", choices=["avito", "hh"], required=True)
     parser.add_argument("--query", required=True)
-    parser.add_argument("--limit", type=int, default=20)
+    parser.add_argument("--limit", type=int, default=50)
     parser.add_argument("--out", default="data/imports/resumes.jsonl")
     parser.add_argument("--fetcher", choices=["fetch", "dynamic", "stealthy"], default="stealthy")
-    parser.add_argument("--headful", action="store_true", help="Show browser window for dynamic/stealthy fetchers.")
-    parser.add_argument("--wait", type=float, default=1.5, help="Delay between detail requests.")
+    parser.add_argument("--headful", action="store_true", help="Show browser window.")
+    parser.add_argument("--chrome", action="store_true", help="Use installed Chrome instead of patchright.")
+    parser.add_argument("--wait", type=float, default=2.0, help="Delay between detail requests (seconds).")
     args = parser.parse_args()
 
     records = collect(
@@ -389,9 +544,16 @@ def main() -> int:
         fetcher=args.fetcher,
         headless=not args.headful,
         wait=max(0, args.wait),
+        use_chrome=args.chrome,
     )
     write_jsonl(records, Path(args.out))
-    print(json.dumps({"source": args.source, "query": args.query, "exported": len(records), "out": args.out}, ensure_ascii=False))
+    result = {
+        "source": args.source,
+        "query": args.query,
+        "exported": len(records),
+        "out": args.out,
+    }
+    print(json.dumps(result, ensure_ascii=False))
     return 0 if records else 2
 
 
