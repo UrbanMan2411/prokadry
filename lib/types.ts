@@ -91,6 +91,7 @@ export interface Message {
   fromRole: 'employer' | 'candidate';
   fromName: string;
   toName: string;
+  counterpartyUserId: string;
   text: string;
   createdAt: string;
   isRead: boolean;

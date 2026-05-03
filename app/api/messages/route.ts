@@ -46,6 +46,7 @@ export async function GET(_req: NextRequest) {
       fromRole: m.sender.role === 'EMPLOYER' ? 'employer' : 'candidate',
       fromName: userName(m.sender),
       toName: userName(m.recipient),
+      counterpartyUserId: m.sender.id === session.userId ? m.recipientId : m.senderId,
       text: m.text,
       createdAt: m.createdAt.toISOString(),
       isRead: m.isRead,
@@ -55,5 +56,40 @@ export async function GET(_req: NextRequest) {
   } catch (err) {
     console.error('[api/messages]', err);
     return NextResponse.json([], { status: 200 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const session = await getSession();
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const body = await req.json();
+    const { text, recipientUserId, resumeId } = body;
+    if (!text || text.trim().length < 2) {
+      return NextResponse.json({ error: 'Message too short' }, { status: 400 });
+    }
+
+    let targetUserId: string | null = recipientUserId ?? null;
+
+    if (!targetUserId && resumeId) {
+      const resume = await db.resume.findUnique({ where: { id: resumeId }, select: { userId: true } });
+      targetUserId = resume?.userId ?? null;
+    }
+
+    if (!targetUserId) return NextResponse.json({ error: 'Recipient not found' }, { status: 400 });
+
+    const msg = await db.message.create({
+      data: {
+        senderId: session.userId,
+        recipientId: targetUserId,
+        text: text.trim(),
+      },
+    });
+
+    return NextResponse.json({ id: msg.id, createdAt: msg.createdAt }, { status: 201 });
+  } catch (err) {
+    console.error('[api/messages POST]', err);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

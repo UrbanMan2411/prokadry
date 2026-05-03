@@ -45,6 +45,7 @@ HH_BASE = "https://hh.ru"
 HH_SEARCH = f"{HH_BASE}/search/resume"
 
 CHROME_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+HH_PROFILE_DIR = os.path.join(os.path.dirname(__file__), ".hh_session")
 
 CITY_REGION = {
     "Москва": "Москва",
@@ -124,13 +125,19 @@ def selector_all_text(node: object, *selectors: str) -> list[str]:
 
 def _accept_avito_cookies(page: object) -> None:
     """page_action callback: accept Avito cookie consent if shown."""
-    try:
-        btn = page.query_selector('[data-marker="cookie-alert/button"]')
-        if btn:
-            btn.click()
-            page.wait_for_timeout(1000)
-    except Exception:
-        pass
+    for sel in [
+        '[data-marker="cookie-consent/button(0)"]',
+        '[data-marker="cookie-alert/button"]',
+        'button[class*="cookie"]',
+    ]:
+        try:
+            btn = page.query_selector(sel)
+            if btn:
+                btn.click()
+                page.wait_for_timeout(2000)
+                break
+        except Exception:
+            pass
 
 
 def _accept_hh_cookies(page: object) -> None:
@@ -146,23 +153,23 @@ def _accept_hh_cookies(page: object) -> None:
         pass
 
 
-def _build_stealthy_kwargs(source: str, headless: bool, use_chrome: bool) -> dict:
+def _build_stealthy_kwargs(source: str, headless: bool, use_chrome: bool, use_session: bool = False) -> dict:
     kwargs: dict = {
         "headless": headless,
         "network_idle": True,
         "block_ads": True,
         "locale": "ru-RU",
-        "timezone_id": "Europe/Moscow",
-        "retries": 2,
         "page_action": _accept_avito_cookies if source == "avito" else _accept_hh_cookies,
     }
+    if use_session and source == "hh":
+        kwargs["user_data_dir"] = HH_PROFILE_DIR
     if use_chrome and os.path.isfile(CHROME_PATH):
         kwargs["real_chrome"] = True
         kwargs["executable_path"] = CHROME_PATH
     return kwargs
 
 
-def fetch_page(url: str, fetcher: str, *, source: str, headless: bool, wait: float, use_chrome: bool = False):
+def fetch_page(url: str, fetcher: str, *, source: str, headless: bool, wait: float, use_chrome: bool = False, use_session: bool = False):
     if wait > 0:
         time.sleep(wait + random.random() * 0.5)
 
@@ -181,7 +188,7 @@ def fetch_page(url: str, fetcher: str, *, source: str, headless: bool, wait: flo
         )
 
     if fetcher == "stealthy":
-        return StealthyFetcher.fetch(url, **_build_stealthy_kwargs(source, headless, use_chrome))
+        return StealthyFetcher.fetch(url, **_build_stealthy_kwargs(source, headless, use_chrome, use_session))
 
     raise ValueError(f"Unknown fetcher: {fetcher}")
 
@@ -332,14 +339,17 @@ def extract_hh_cards(page: object) -> list[dict]:
         except Exception:
             nodes = []
         for node in nodes:
-            href = selector_text(node, 'a[href*="/resume/"]::attr(href)', "a::attr(href)")
-            title = selector_text(
+            href = selector_text(
                 node,
-                '[data-qa="resume-serp__resume-title"]::text',
-                '[data-qa*="resume-title"]::text',
-                "h3::text",
-                "a::text",
+                'a[data-qa="serp-item__title"]::attr(href)',
+                'a[href*="/resume/"]::attr(href)',
+                "a::attr(href)",
             )
+            # profession-trigger-text contains the job title (nested spans, get first)
+            title_nodes = node.css('[data-qa="profession-trigger-text"]')
+            title = clean_text(title_nodes[0].get_all_text()) if title_nodes else ""
+            if not title:
+                title = selector_text(node, '[data-qa="serp-item__title-text"]::text', "h3::text")
             if not href or not title:
                 continue
             source_id = href.rstrip("/").split("/")[-1].split("?")[0]
@@ -466,6 +476,41 @@ def parse_hh_detail(page: object, card: dict) -> ResumeRecord:
     )
 
 
+PROCUREMENT_KEYWORDS = {
+    "закупк", "44-фз", "223-фз", "44 фз", "223 фз", "контрактн",
+    "тендер", "торг", "поставщик", "конкурс", "аукцион", "госзакупк",
+    "procurement", "закупочн", "котировк", "запрос предложений",
+}
+
+def is_relevant(record: ResumeRecord) -> bool:
+    text = (record.position + " " + record.about).lower()
+    return any(kw in text for kw in PROCUREMENT_KEYWORDS)
+
+
+def hh_login(fetcher: str, use_chrome: bool) -> None:
+    """Open hh.ru login page in a visible browser window and wait for user to log in."""
+    os.makedirs(HH_PROFILE_DIR, exist_ok=True)
+    print("[login] Opening hh.ru login page. Log in, then close the browser window.", file=sys.stderr)
+
+    def wait_for_user(page: object) -> None:
+        try:
+            page.wait_for_url("https://hh.ru/**", timeout=120_000)
+            page.wait_for_timeout(2000)
+        except Exception:
+            pass
+
+    StealthyFetcher.fetch(
+        "https://hh.ru/account/login",
+        headless=False,
+        network_idle=True,
+        locale="ru-RU",
+        user_data_dir=HH_PROFILE_DIR,
+        page_action=wait_for_user,
+        **({"real_chrome": True, "executable_path": CHROME_PATH} if use_chrome and os.path.isfile(CHROME_PATH) else {}),
+    )
+    print("[login] Session saved to", HH_PROFILE_DIR, file=sys.stderr)
+
+
 def collect(
     source: str,
     query: str,
@@ -474,10 +519,12 @@ def collect(
     headless: bool,
     wait: float,
     use_chrome: bool,
+    use_session: bool = False,
 ) -> list[ResumeRecord]:
     records: list[ResumeRecord] = []
+    skipped_irrelevant = 0
     page_no = 1
-    while len(records) < limit and page_no <= 10:
+    while len(records) < limit and page_no <= 20:
         search_url = avito_search_url(query, page_no) if source == "avito" else hh_search_url(query, page_no)
         print(f"[scrape] search page {page_no}: {search_url}", file=sys.stderr)
         try:
@@ -485,7 +532,7 @@ def collect(
                 search_url, fetcher,
                 source=source, headless=headless,
                 wait=wait if page_no > 1 else 0,
-                use_chrome=use_chrome,
+                use_chrome=use_chrome, use_session=use_session,
             )
         except Exception as exc:
             print(f"[scrape] search page error: {exc}", file=sys.stderr)
@@ -504,17 +551,24 @@ def collect(
                 detail_page = fetch_page(
                     card["url"], fetcher,
                     source=source, headless=headless,
-                    wait=wait, use_chrome=use_chrome,
+                    wait=wait, use_chrome=use_chrome, use_session=use_session,
                 )
                 record = (
                     parse_avito_detail(detail_page, card)
                     if source == "avito"
                     else parse_hh_detail(detail_page, card)
                 )
+                if not is_relevant(record):
+                    skipped_irrelevant += 1
+                    print(f"[scrape] irrelevant, skip ({record.position})", file=sys.stderr)
+                    continue
                 records.append(record)
             except Exception as exc:
                 print(f"[scrape] skipped {card['url']}: {exc}", file=sys.stderr)
         page_no += 1
+
+    if skipped_irrelevant:
+        print(f"[scrape] filtered out {skipped_irrelevant} irrelevant records", file=sys.stderr)
     return records
 
 
@@ -534,8 +588,17 @@ def main() -> int:
     parser.add_argument("--fetcher", choices=["fetch", "dynamic", "stealthy"], default="stealthy")
     parser.add_argument("--headful", action="store_true", help="Show browser window.")
     parser.add_argument("--chrome", action="store_true", help="Use installed Chrome instead of patchright.")
+    parser.add_argument("--login", action="store_true", help="Open hh.ru login page to save session, then exit.")
+    parser.add_argument("--session", action="store_true", help="Use saved hh.ru browser session (after --login).")
     parser.add_argument("--wait", type=float, default=2.0, help="Delay between detail requests (seconds).")
     args = parser.parse_args()
+
+    if args.login:
+        if args.source != "hh":
+            print("--login only works with --source hh", file=sys.stderr)
+            return 1
+        hh_login(args.fetcher, args.chrome)
+        return 0
 
     records = collect(
         source=args.source,
@@ -545,6 +608,7 @@ def main() -> int:
         headless=not args.headful,
         wait=max(0, args.wait),
         use_chrome=args.chrome,
+        use_session=args.session,
     )
     write_jsonl(records, Path(args.out))
     result = {

@@ -132,6 +132,7 @@ export const MESSAGES: Message[] = Array.from({ length: 15 }, (_, i): Message =>
   fromRole: i % 2 === 0 ? 'employer' : 'candidate',
   fromName: i % 2 === 0 ? EMPLOYERS[i % EMPLOYERS.length].name : RESUMES[i % RESUMES.length].fullName,
   toName: i % 2 === 0 ? RESUMES[i % RESUMES.length].fullName : EMPLOYERS[i % EMPLOYERS.length].name,
+  counterpartyUserId: '',
   text: i % 2 === 0
     ? 'Добрый день! Мы заинтересованы в вашей кандидатуре. Можем ли мы договориться о звонке?'
     : 'Здравствуйте! Да, я готов обсудить детали. Удобное время — любой будний день с 10 до 18.',

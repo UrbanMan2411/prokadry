@@ -158,7 +158,16 @@ export function InviteModal({
         <Btn variant="ghost" onClick={() => setStep(1)}>← Назад</Btn>
         <div className="flex gap-2">
           <Btn variant="secondary" onClick={handleClose}>Отмена</Btn>
-          <Btn variant="primary" disabled={len < 10 || len > 2000} onClick={() => setStep('done')}>
+          <Btn variant="primary" disabled={len < 10 || len > 2000} onClick={async () => {
+            if (resume) {
+              await fetch('/api/invitations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ resumeId: resume.id, vacancyId, message }),
+              }).catch(() => {});
+            }
+            setStep('done');
+          }}>
             Отправить приглашение
           </Btn>
         </div>
@@ -209,7 +218,16 @@ export function MessageModal({
       </div>
       <div className="flex justify-end gap-2">
         <Btn variant="secondary" onClick={handleClose}>Отмена</Btn>
-        <Btn variant="primary" disabled={len < 10 || len > 2000} onClick={() => setSent(true)}>Отправить</Btn>
+        <Btn variant="primary" disabled={len < 10 || len > 2000} onClick={async () => {
+        if (resume) {
+          await fetch('/api/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ resumeId: resume.id, text }),
+          }).catch(() => {});
+        }
+        setSent(true);
+      }}>Отправить</Btn>
       </div>
     </Modal>
   );

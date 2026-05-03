@@ -60,3 +60,54 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json([], { status: 200 });
   }
 }
+
+export async function POST(req: NextRequest) {
+  try {
+    const session = await getSession();
+    if (!session || session.role !== 'EMPLOYER') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const emp = await db.employer.findUnique({
+      where: { userId: session.userId },
+      select: { id: true },
+    });
+    if (!emp) return NextResponse.json({ error: 'Employer not found' }, { status: 404 });
+
+    const { resumeId, vacancyId, message } = await req.json();
+    if (!resumeId || !vacancyId || !message) {
+      return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+    }
+
+    const vacancy = await db.vacancy.findFirst({ where: { id: vacancyId, employerId: emp.id } });
+    if (!vacancy) return NextResponse.json({ error: 'Vacancy not found' }, { status: 404 });
+
+    const row = await db.invitation.create({
+      data: { resumeId, vacancyId, message, status: 'SENT' },
+      include: {
+        resume: { select: { firstName: true, lastName: true } },
+        vacancy: { select: { title: true, employer: { select: { name: true } } } },
+      },
+    });
+
+    const invitation: Invitation = {
+      id: row.id,
+      resumeId: row.resumeId,
+      vacancyId: row.vacancyId,
+      candidateName: `${row.resume.firstName} ${row.resume.lastName}`.trim(),
+      vacancyTitle: row.vacancy.title,
+      employerName: row.vacancy.employer.name,
+      message: row.message,
+      status: row.status.toLowerCase() as Invitation['status'],
+      createdAt: row.sentAt.toISOString(),
+    };
+
+    return NextResponse.json(invitation, { status: 201 });
+  } catch (err: unknown) {
+    if ((err as { code?: string }).code === 'P2002') {
+      return NextResponse.json({ error: 'Invitation already exists' }, { status: 409 });
+    }
+    console.error('[api/invitations POST]', err);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
+}

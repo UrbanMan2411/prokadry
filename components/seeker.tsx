@@ -420,6 +420,11 @@ export function MyResume() {
 export function SeekerInvitations({ invitations, setInvitations }: { invitations: Invitation[]; setInvitations: React.Dispatch<React.SetStateAction<Invitation[]>> }) {
   const respond = (id: string, status: 'accepted' | 'rejected') => {
     setInvitations(prev => prev.map(i => i.id === id ? { ...i, status } : i));
+    fetch(`/api/invitations/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    }).catch(() => {});
   };
 
   return (
@@ -461,7 +466,7 @@ export function SeekerInvitations({ invitations, setInvitations }: { invitations
 
 // ── Seeker Messages ────────────────────────────────────────────────────────
 type ChatMsg = { id: string; fromMe: boolean; text: string; ts: string };
-type Thread  = { id: string; name: string; msgs: ChatMsg[]; unread: boolean };
+type Thread  = { id: string; name: string; msgs: ChatMsg[]; unread: boolean; counterpartyUserId: string };
 
 function buildSeekerThreads(messages: Message[]): Thread[] {
   return messages.map(m => ({
@@ -469,6 +474,7 @@ function buildSeekerThreads(messages: Message[]): Thread[] {
     name: m.fromRole === 'employer' ? m.fromName : m.toName,
     msgs: [{ id: m.id, fromMe: m.fromRole === 'candidate', text: m.text, ts: m.createdAt }],
     unread: !m.isRead,
+    counterpartyUserId: m.counterpartyUserId,
   }));
 }
 
@@ -485,10 +491,19 @@ export function SeekerMessages({ messages, onMarkRead }: { messages: Message[]; 
   }, [active?.msgs.length]);
 
   const send = () => {
-    if (!activeId || reply.trim().length < 2) return;
-    const msg: ChatMsg = { id: Date.now().toString(), fromMe: true, text: reply.trim(), ts: new Date().toISOString() };
-    setThreads(prev => prev.map(t => t.id === activeId ? { ...t, msgs: [...t.msgs, msg], unread: false } : t));
+    const text = reply.trim();
+    if (!activeId || text.length < 2) return;
+    const t = threads.find(thr => thr.id === activeId);
+    const msg: ChatMsg = { id: Date.now().toString(), fromMe: true, text, ts: new Date().toISOString() };
+    setThreads(prev => prev.map(thr => thr.id === activeId ? { ...thr, msgs: [...thr.msgs, msg], unread: false } : thr));
     setReply('');
+    if (t?.counterpartyUserId) {
+      fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipientUserId: t.counterpartyUserId, text }),
+      }).catch(() => {});
+    }
   };
 
   const lastMsg = (t: Thread) => t.msgs[t.msgs.length - 1];

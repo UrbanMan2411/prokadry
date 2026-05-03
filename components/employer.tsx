@@ -235,25 +235,56 @@ export function EmployerVacancies({
     return true;
   });
 
-  const handleSave = (form: Partial<Vacancy>) => {
+  const handleSave = async (form: Partial<Vacancy>) => {
     if (editing) {
       setVacancies(prev => prev.map(v => v.id === editing.id ? { ...v, ...form } : v));
+      fetch(`/api/vacancies/${editing.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      }).catch(() => {});
     } else {
-      const newV: Vacancy = {
-        ...form as Vacancy,
-        id: `VAC-${String(vacancies.length + 1).padStart(3, '0')}`,
-        employerId: 'EMP-001', employerName: 'ООО «ТехноСервис»',
-        region: 'Москва', createdAt: new Date().toISOString().split('T')[0], skills: [],
-      };
-      setVacancies(prev => [newV, ...prev]);
+      try {
+        const res = await fetch('/api/vacancies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form),
+        });
+        if (res.ok) {
+          const newV: Vacancy = await res.json();
+          setVacancies(prev => [newV, ...prev]);
+        } else {
+          throw new Error('Failed');
+        }
+      } catch {
+        const newV: Vacancy = {
+          ...form as Vacancy,
+          id: `VAC-${String(vacancies.length + 1).padStart(3, '0')}`,
+          employerId: '', employerName: '',
+          region: '', createdAt: new Date().toISOString().split('T')[0], skills: [],
+        };
+        setVacancies(prev => [newV, ...prev]);
+      }
     }
     setEditing(null);
   };
 
-  const archive = (id: string) =>
+  const archive = (id: string) => {
     setVacancies(prev => prev.map(v => v.id === id ? { ...v, status: 'archived' } : v));
-  const activate = (id: string) =>
+    fetch(`/api/vacancies/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'archived' }),
+    }).catch(() => {});
+  };
+  const activate = (id: string) => {
     setVacancies(prev => prev.map(v => v.id === id ? { ...v, status: 'active' } : v));
+    fetch(`/api/vacancies/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'active' }),
+    }).catch(() => {});
+  };
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto">
@@ -525,6 +556,7 @@ type Thread = {
   id: string; name: string; msgs: ChatMsg[]; unread: boolean;
   contactState: ContactState;
   contactInfo: { phone: string; email: string; telegram: string };
+  counterpartyUserId?: string;
 };
 
 function detectContactInText(text: string): 'phone' | 'email' | 'messenger' | 'link' | null {
@@ -564,6 +596,7 @@ function buildThreads(messages: Message[]): Thread[] {
         email: `candidate${i + 1}@mail.ru`,
         telegram: `@specialist_${i + 1}`,
       },
+      counterpartyUserId: m.counterpartyUserId,
     })),
   ];
 }
@@ -609,6 +642,15 @@ export function EmployerMessages({ messages, onMarkRead }: { messages: Message[]
         setThreads(prev => prev.map(t => t.id === AI_THREAD_ID ? { ...t, msgs: [...t.msgs, errMsg] } : t));
       } finally {
         setAiTyping(false);
+      }
+    } else {
+      const t = threads.find(thr => thr.id === activeId);
+      if (t?.counterpartyUserId) {
+        fetch('/api/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ recipientUserId: t.counterpartyUserId, text }),
+        }).catch(() => {});
       }
     }
   };
