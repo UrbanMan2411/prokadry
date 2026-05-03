@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Role } from '@/lib/types';
 import type { Resume, Vacancy, Employer, Message, Invitation } from '@/lib/types';
-import { RESUMES, VACANCIES, INVITATIONS, MESSAGES, EMPLOYERS, AUDIT_LOGS } from '@/lib/mock-data';
+import { AUDIT_LOGS } from '@/lib/mock-data';
 import { AppShell } from '@/components/layout';
 import { ResumeRegistry } from '@/components/registry';
 import { ResumeDetail, InviteModal } from '@/components/resume';
@@ -30,11 +30,21 @@ const DEFAULT_PAGE: Record<Role, string> = {
 export default function ClientApp({ initialRole, email }: { initialRole: Role; email: string }) {
   const [role, setRole] = useState<Role>(initialRole);
   const [page, setPage] = useState<string>(DEFAULT_PAGE[initialRole]);
-  const [resumes, setResumes] = useState<Resume[]>(RESUMES);
-  const [vacancies, setVacancies] = useState<Vacancy[]>(VACANCIES);
-  const [employers, setEmployers] = useState<Employer[]>(EMPLOYERS);
-  const [messages, setMessages] = useState<Message[]>(MESSAGES);
-  const [invitations, setInvitations] = useState<Invitation[]>(INVITATIONS);
+  const [resumes, setResumes] = useState<Resume[]>([]);
+  const [vacancies, setVacancies] = useState<Vacancy[]>([]);
+  const [employers, setEmployers] = useState<Employer[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+
+  useEffect(() => {
+    fetch('/api/resumes').then(r => r.json()).then(setResumes).catch(() => {});
+    fetch('/api/vacancies').then(r => r.json()).then(setVacancies).catch(() => {});
+    fetch('/api/messages').then(r => r.json()).then(setMessages).catch(() => {});
+    fetch('/api/invitations').then(r => r.json()).then(setInvitations).catch(() => {});
+    if (initialRole === 'admin') {
+      fetch('/api/employers').then(r => r.json()).then(setEmployers).catch(() => {});
+    }
+  }, [initialRole]);
   const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
   const [inviteTarget, setInviteTarget] = useState<Resume | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);

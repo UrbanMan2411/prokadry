@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed": "tsx scripts/seed-resumes.ts"
+    "seed": "tsx scripts/seed-resumes.ts",
+    "scrape:resumes": "python scrapers/resume_scraper.py",
+    "import:scraped-resumes": "tsx scripts/import-scraped-resumes.ts"
   },
   "dependencies": {
     "@2gis/mapgl": "^1.72.0",
