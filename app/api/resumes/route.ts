@@ -15,23 +15,36 @@ export async function GET(_req: NextRequest) {
   try {
     const session = await getSession();
 
+    // Unauthenticated — no access
+    if (!session) return NextResponse.json([], { status: 200 });
+
     let employerId: string | null = null;
-    if (session?.role === 'EMPLOYER') {
+    let resumeWhere: Record<string, unknown> = {};
+
+    if (session.role === 'SEEKER') {
+      // Seeker sees only their own resume (any status)
+      resumeWhere = { userId: session.userId };
+    } else if (session.role === 'ADMIN') {
+      resumeWhere = { status: { in: ['ACTIVE', 'PENDING', 'DRAFT'] } };
+    } else if (session.role === 'EMPLOYER') {
       const emp = await db.employer.findUnique({
         where: { userId: session.userId },
-        select: { id: true },
+        select: { id: true, status: true },
       });
-      employerId = emp?.id ?? null;
+      // PENDING employer can't see candidate data yet
+      if (!emp || emp.status !== 'APPROVED') {
+        return NextResponse.json([], { status: 200 });
+      }
+      employerId = emp.id;
+      resumeWhere = { status: { in: ['ACTIVE', 'PENDING'] } };
+    } else {
+      return NextResponse.json([], { status: 200 });
     }
 
-    const isAdmin = session?.role === 'ADMIN';
+    const isAdmin = session.role === 'ADMIN';
 
     const rows = await db.resume.findMany({
-      where: {
-        status: isAdmin
-          ? { in: ['ACTIVE', 'PENDING', 'DRAFT'] }
-          : { in: ['ACTIVE', 'PENDING'] },
-      },
+      where: resumeWhere,
       include: {
         workExperiences: { orderBy: { sortOrder: 'asc' } },
         activityAreas: { include: { dictItem: true } },

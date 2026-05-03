@@ -18,6 +18,10 @@ export function EmployerDashboard({
   const activeVac = vacancies.filter(v => v.status === 'active').length;
   const pendingInv = invitations.filter(i => i.status === 'sent').length;
   const unviewedInv = invitations.filter(i => i.status === 'viewed').length;
+  const [empStatus, setEmpStatus] = useState('');
+  useEffect(() => {
+    fetch('/api/employers/me').then(r => r.json()).then(d => setEmpStatus(d.status ?? '')).catch(() => {});
+  }, []);
   const attentionItems = [
     pendingInv > 0 && `${pendingInv} приглашений ждут ответа`,
     unviewedInv > 0 && `${unviewedInv} приглашений просмотрено, но не принято`,
@@ -25,6 +29,17 @@ export function EmployerDashboard({
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
+      {empStatus === 'pending' && (
+        <div className="mb-5 flex items-start gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
+          <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <div>
+            <p className="text-sm font-semibold text-amber-800">Аккаунт ожидает проверки</p>
+            <p className="text-xs text-amber-700 mt-0.5">После одобрения администратором вы сможете публиковать вакансии и просматривать резюме.</p>
+          </div>
+        </div>
+      )}
       {/* Attention bar */}
       {attentionItems.length > 0 && (
         <div className="mb-5 flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
@@ -1003,15 +1018,39 @@ function validateINN(inn: string): boolean {
 
 export function CompanyProfile() {
   const [form, setForm] = useState({
-    name: 'ООО «ТехноСервис»', inn: '7700000001', kpp: '770001001', ogrn: '1027700000001',
-    legalAddress: '109012, г. Москва, ул. Ленина, д. 1',
-    region: 'Москва', city: 'Москва', okved: '62.01 — Разработка компьютерного ПО',
-    orgStatus: 'Действующая', head: 'Иванов Алексей Петрович', registrationDate: '15.03.2001',
-    contactName: 'Иванов Алексей Петрович', email: 'hr1@company1.ru',
-    phone: '+7 (900) 300-10-20',
-    description: 'Ведущая компания в сфере государственных закупок и тендерного сопровождения.',
+    name: '', inn: '', kpp: '', ogrn: '',
+    legalAddress: '',
+    region: '', city: '', okved: '',
+    orgStatus: '', head: '', registrationDate: '',
+    contactName: '', email: '',
+    phone: '',
+    description: '',
   });
+  const [empStatus, setEmpStatus] = useState('');
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/employers/me')
+      .then(r => r.json())
+      .then(d => {
+        setForm(f => ({
+          ...f,
+          name: d.name ?? '',
+          inn: d.inn ?? '',
+          ogrn: d.ogrn ?? '',
+          region: d.region ?? '',
+          city: d.city ?? '',
+          legalAddress: d.address ?? '',
+          contactName: d.contactName ?? '',
+          phone: d.phone ?? '',
+          description: d.description ?? '',
+          email: d.email ?? '',
+        }));
+        setEmpStatus(d.status ?? '');
+      })
+      .catch(() => {});
+  }, []);
   const [innLookupState, setInnLookupState] = useState<InnLookupState>('idle');
   const [innResult, setInnResult] = useState<InnData | null>(null);
 
@@ -1150,9 +1189,34 @@ export function CompanyProfile() {
             />
           </div>
         </div>
-        <div className="flex justify-end mt-4 pt-4 border-t border-slate-100 gap-2 items-center">
-          {saved && <span className="text-sm text-emerald-600">✓ Сохранено</span>}
-          <Btn variant="primary" onClick={() => setSaved(true)}>Сохранить изменения</Btn>
+        <div className="flex justify-between mt-4 pt-4 border-t border-slate-100 gap-2 items-center flex-wrap">
+          <div>
+            {empStatus === 'pending' && (
+              <span className="text-xs font-medium px-2.5 py-1 rounded-full text-amber-700 bg-amber-50">
+                Аккаунт ожидает одобрения администратором
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {saved && <span className="text-sm text-emerald-600">✓ Сохранено</span>}
+            <Btn variant="primary" disabled={saving} onClick={async () => {
+              setSaving(true);
+              const res = await fetch('/api/employers/me', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  name: form.name, ogrn: form.ogrn, region: form.region,
+                  city: form.city, address: form.legalAddress,
+                  contactName: form.contactName, phone: form.phone,
+                  description: form.description,
+                }),
+              }).catch(() => null);
+              setSaving(false);
+              if (res?.ok) setSaved(true);
+            }}>
+              {saving ? 'Сохранение…' : 'Сохранить изменения'}
+            </Btn>
+          </div>
         </div>
       </div>
     </div>

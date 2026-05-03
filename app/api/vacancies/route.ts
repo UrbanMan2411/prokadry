@@ -20,13 +20,13 @@ export async function GET(_req: NextRequest) {
       }
     }
 
+    type VS = 'ACTIVE' | 'DRAFT' | 'ARCHIVED';
+    const statusIn: VS[] = isAdmin || employerFilter.employerId
+      ? ['ACTIVE', 'DRAFT', 'ARCHIVED']
+      : ['ACTIVE'];
+
     const rows = await db.vacancy.findMany({
-      where: {
-        status: isAdmin
-          ? { in: ['ACTIVE', 'DRAFT', 'ARCHIVED'] }
-          : { in: ['ACTIVE', 'DRAFT'] },
-        ...employerFilter,
-      },
+      where: { status: { in: statusIn }, ...employerFilter },
       include: {
         employer: { select: { id: true, name: true } },
         skills: { include: { dictItem: true } },
@@ -69,16 +69,19 @@ export async function POST(req: NextRequest) {
 
     const emp = await db.employer.findUnique({
       where: { userId: session.userId },
-      select: { id: true, name: true, region: true },
+      select: { id: true, name: true, region: true, status: true },
     });
     if (!emp) return NextResponse.json({ error: 'Employer not found' }, { status: 404 });
 
     const body = await req.json();
     const { title, department, city, workMode, salaryFrom, salaryTo, description, status } = body;
 
-    const dbStatus = (['DRAFT', 'ACTIVE', 'ARCHIVED'].includes((status ?? '').toUpperCase())
+    const requestedStatus = (['DRAFT', 'ACTIVE', 'ARCHIVED'].includes((status ?? '').toUpperCase())
       ? status.toUpperCase()
       : 'ACTIVE') as 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
+    // Unapproved employers can only save drafts
+    const dbStatus: 'DRAFT' | 'ACTIVE' | 'ARCHIVED' =
+      emp.status !== 'APPROVED' ? 'DRAFT' : requestedStatus;
 
     const row = await db.vacancy.create({
       data: {

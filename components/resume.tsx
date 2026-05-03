@@ -160,11 +160,13 @@ export function InviteModal({
           <Btn variant="secondary" onClick={handleClose}>Отмена</Btn>
           <Btn variant="primary" disabled={len < 10 || len > 2000} onClick={async () => {
             if (resume) {
-              await fetch('/api/invitations', {
+              const res = await fetch('/api/invitations', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ resumeId: resume.id, vacancyId, message }),
-              }).catch(() => {});
+              }).catch(() => null);
+              // 409 = already invited — treat as success
+              if (res && !res.ok && res.status !== 409) return;
             }
             setStep('done');
           }}>
