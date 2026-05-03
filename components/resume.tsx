@@ -245,7 +245,7 @@ export function ResumeDetail({
   const [invOpen, setInvOpen] = useState(false);
 
   if (!resume) return null;
-  const hasSVO = resume.specialStatuses.some(s => s.includes('СВО') || s.includes('Инвалид'));
+  const hasSVO = resume.specialStatuses.some(s => s.confirmed || s.value === 'svo_participant' || s.value === 'disabled');
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -283,11 +283,11 @@ export function ResumeDetail({
                 {hasSVO && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {resume.specialStatuses.map(s => (
-                      <span key={s} className="inline-flex items-center gap-1.5 px-3 py-1 bg-cyan-50 text-cyan-700 text-xs font-semibold rounded-full ring-1 ring-cyan-200">
+                      <span key={s.value} className="inline-flex items-center gap-1.5 px-3 py-1 bg-cyan-50 text-cyan-700 text-xs font-semibold rounded-full ring-1 ring-cyan-200">
                         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                         </svg>
-                        {s}
+                        {s.label}
                       </span>
                     ))}
                   </div>
@@ -336,7 +336,7 @@ export function ResumeDetail({
             <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
               <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Сданные тесты</h3>
               <div className="flex flex-wrap gap-1.5">
-                {resume.tests.map(t => <Badge key={t} color="blue">{t}</Badge>)}
+                {resume.tests.map(t => <Badge key={t.value} color="blue">{t.label}</Badge>)}
               </div>
             </div>
           )}

@@ -342,7 +342,7 @@ function ResumeRow({ resume, expanded, onExpand, onOpen, onInvite, onToggleFav, 
         <td className="px-3 py-2.5">
           <div className="flex flex-wrap gap-0.5 max-w-[120px]">
             {resume.tests.slice(0, 2).map(t => (
-              <span key={t} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-medium rounded ring-1 ring-blue-100">{t}</span>
+              <span key={t.value} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-medium rounded ring-1 ring-blue-100">{t.label}</span>
             ))}
             {hasSVO && (
               <span className="px-1.5 py-0.5 bg-cyan-50 text-cyan-700 text-[10px] font-medium rounded ring-1 ring-cyan-100">СВО</span>
@@ -480,8 +480,8 @@ function ResumeCards({ resumes, onOpen, onInvite, onToggleFav }: {
           <p className="text-xs text-slate-500 leading-relaxed line-clamp-2 mb-3">{r.about}</p>
 
           <div className="flex flex-wrap gap-1 mb-3">
-            {r.tests.map(t => <span key={t} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-medium rounded ring-1 ring-blue-100">{t}</span>)}
-            {r.specialStatuses.map(s => <span key={s} className="px-1.5 py-0.5 bg-cyan-50 text-cyan-700 text-[10px] font-medium rounded ring-1 ring-cyan-100">{s}</span>)}
+            {r.tests.map(t => <span key={t.value} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-medium rounded ring-1 ring-blue-100">{t.label}</span>)}
+            {r.specialStatuses.map(s => <span key={s.value} className="px-1.5 py-0.5 bg-cyan-50 text-cyan-700 text-[10px] font-medium rounded ring-1 ring-cyan-100">{s.label}</span>)}
             {r.activityAreas.slice(0, 2).map(a => <span key={a} className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-medium rounded">{a}</span>)}
           </div>
 
@@ -695,8 +695,8 @@ export function ResumeRegistry({
     if (filters.onlyPhoto && !r.hasPhoto) return false;
     if (filters.region && r.region !== filters.region) return false;
     if (filters.position && r.position !== filters.position) return false;
-    if (filters.specialStatus && !r.specialStatuses.includes(filters.specialStatus)) return false;
-    if (filters.test && !r.tests.includes(filters.test)) return false;
+    if (filters.specialStatus && !r.specialStatuses.some(s => s.label === filters.specialStatus || s.value === filters.specialStatus)) return false;
+    if (filters.test && !r.tests.some(t => t.label === filters.test || t.value === filters.test)) return false;
     if (filters.activityArea && !r.activityAreas.includes(filters.activityArea)) return false;
     if (filters.specialistActivity && !r.activityAreas.includes(filters.specialistActivity)) return false;
     if (filters.salaryFrom && r.salary != null && r.salary < parseInt(filters.salaryFrom)) return false;

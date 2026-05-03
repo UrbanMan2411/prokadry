@@ -257,7 +257,7 @@ export function RegionDetail({
                 </div>
                 <div className="flex gap-1 flex-shrink-0">
                   {r.tests.slice(0, 1).map(t => (
-                    <span key={t} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-medium rounded ring-1 ring-blue-100">{t}</span>
+                    <span key={t.value} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-medium rounded ring-1 ring-blue-100">{t.label}</span>
                   ))}
                 </div>
               </div>
@@ -296,11 +296,11 @@ export function RegionDetail({
         </div>
         <div className="px-5 py-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { title: 'Участники СВО', key: 'Участник СВО', cls: 'text-red-600 bg-red-50' },
-            { title: 'Члены семей СВО', key: 'Член семьи участника СВО', cls: 'text-orange-600 bg-orange-50' },
-            { title: 'Инвалиды', key: 'Инвалид', cls: 'text-purple-600 bg-purple-50' },
+            { title: 'Участники СВО', key: 'svo_participant', cls: 'text-red-600 bg-red-50' },
+            { title: 'Члены семей СВО', key: 'svo_family', cls: 'text-orange-600 bg-orange-50' },
+            { title: 'Люди с ОВЗ', key: 'disabled', cls: 'text-purple-600 bg-purple-50' },
           ].map(s => {
-            const count = regionRes.filter(r => r.specialStatuses.includes(s.key)).length;
+            const count = regionRes.filter(r => r.specialStatuses.some(ss => ss.value === s.key)).length;
             return (
               <div key={s.title} className={`text-center p-4 rounded-xl ${s.cls}`}>
                 <div className="text-3xl font-bold">{count}</div>

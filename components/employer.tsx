@@ -437,7 +437,7 @@ export function EmployerFavorites({
   if (salaryFrom) favs = favs.filter(r => r.salary !== null && r.salary >= parseInt(salaryFrom) * 1000);
   if (salaryTo) favs = favs.filter(r => r.salary !== null && r.salary <= parseInt(salaryTo) * 1000);
   if (specialization) favs = favs.filter(r => r.activityAreas.includes(specialization));
-  if (socialStatus) favs = favs.filter(r => r.specialStatuses.includes(socialStatus));
+  if (socialStatus) favs = favs.filter(r => r.specialStatuses.some(s => s.value === socialStatus || s.label === socialStatus));
 
   if (sort === 'salary') favs = [...favs].sort((a, b) => (b.salary ?? 0) - (a.salary ?? 0));
   else if (sort === 'experience') favs = [...favs].sort((a, b) => b.experience - a.experience);
@@ -543,8 +543,8 @@ export function EmployerFavorites({
               </div>
 
               <div className="flex flex-wrap gap-1 mb-3">
-                {r.tests.map(t => <span key={t} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-medium rounded ring-1 ring-blue-100">{t}</span>)}
-                {r.specialStatuses.map(s => <span key={s} className="px-1.5 py-0.5 bg-cyan-50 text-cyan-700 text-[10px] font-medium rounded ring-1 ring-cyan-100">{s}</span>)}
+                {r.tests.map(t => <span key={t.value} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-medium rounded ring-1 ring-blue-100">{t.label}</span>)}
+                {r.specialStatuses.map(s => <span key={s.value} className="px-1.5 py-0.5 bg-cyan-50 text-cyan-700 text-[10px] font-medium rounded ring-1 ring-cyan-100">{s.label}</span>)}
               </div>
 
               <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">

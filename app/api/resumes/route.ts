@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSession } from '@/lib/session';
-import type { Resume, WorkExperience } from '@/lib/types';
+import type { Resume, WorkExperience, SpecialStatus, ResumeTest } from '@/lib/types';
 
 function calcAge(birthDate: Date): number {
   const now = new Date();
@@ -47,9 +47,9 @@ export async function GET(_req: NextRequest) {
       where: resumeWhere,
       include: {
         workExperiences: { orderBy: { sortOrder: 'asc' } },
-        activityAreas: { include: { dictItem: true } },
-        tests: { include: { dictItem: true } },
-        specialStatuses: { include: { dictItem: true } },
+        activityAreas: { include: { dictItem: { select: { value: true, label: true, category: true } } } },
+        tests: { include: { dictItem: { select: { value: true, label: true } } } },
+        specialStatuses: { include: { dictItem: { select: { value: true, label: true } } } },
       },
       orderBy: { publishedAt: 'desc' },
     });
@@ -77,10 +77,32 @@ export async function GET(_req: NextRequest) {
       salary: r.salary,
       experience: r.experience,
       education: r.education,
+      educationInstitution: r.educationInstitution ?? '',
+      educationYears: r.educationYears ?? '',
       workMode: r.workMode,
-      activityAreas: r.activityAreas.map(a => a.dictItem.label),
-      tests: r.tests.map(t => t.dictItem.label),
-      specialStatuses: r.specialStatuses.map(s => s.dictItem.label),
+      activityAreas: r.activityAreas
+        .filter(a => a.dictItem.category === 'ACTIVITY_AREA')
+        .map(a => a.dictItem.label),
+      skills: r.activityAreas
+        .filter(a => a.dictItem.category === 'SKILL')
+        .map(a => a.dictItem.value),
+      purchaseTypes: r.activityAreas
+        .filter(a => a.dictItem.category === 'PURCHASE_TYPE')
+        .map(a => a.dictItem.value),
+      tests: r.tests.map((t): ResumeTest => ({
+        value: t.dictItem.value,
+        label: t.dictItem.label,
+        passedAt: t.passedAt?.toISOString() ?? null,
+      })),
+      specialStatuses: r.specialStatuses.map((s): SpecialStatus => ({
+        value: s.dictItem.value,
+        label: s.dictItem.label,
+        confirmed: !!s.confirmedAt,
+        docDate: s.docDate ?? '',
+        docNumber: s.docNumber ?? '',
+        documentRef: s.documentRef ?? '',
+        disabilityGroup: s.disabilityGroup ?? '',
+      })),
       hasPhoto: r.hasPhoto,
       photo: r.photoUrl,
       publishedAt: (r.publishedAt ?? r.createdAt).toISOString(),

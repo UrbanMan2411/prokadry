@@ -82,13 +82,105 @@ export function SeekerDashboard({ invitations, messages }: { invitations: Invita
   );
 }
 
-// ── My Resume (multi-resume) ────────────────────────────────────────────────
-type ResumeForm = { id: string; dbId: string; position: string; city: string; salary: string; experience: string; education: string; workMode: string; about: string; dbStatus: string };
+// ── My Resume ──────────────────────────────────────────────────────────────
+type WorkExpEntry = { _id: string; company: string; role: string; fromMonth: string; toMonth: string; isCurrent: boolean; description: string };
+type SpecialStatusEntry = { value: string; docDate: string; docNumber: string; documentRef: string; disabilityGroup: string };
+type TestEntry = { value: string; passedAt: string };
 
-const defaultResume = (id: string, position: string): ResumeForm => ({
-  id, dbId: '', position, city: '', salary: '', experience: '0',
-  education: 'Высшее', workMode: 'Офис', about: '', dbStatus: 'draft',
+type ResumeFormFull = {
+  dbId: string; dbStatus: string;
+  firstName: string; lastName: string; patronymic: string; gender: string;
+  city: string; phone: string;
+  position: string; salary: string; workMode: string;
+  experience: string; education: string; educationInstitution: string; educationYears: string;
+  workExperiences: WorkExpEntry[];
+  activityAreas: string[]; skills: string[]; purchaseTypes: string[];
+  specialStatuses: SpecialStatusEntry[];
+  tests: TestEntry[];
+  about: string;
+};
+
+const emptyForm = (): ResumeFormFull => ({
+  dbId: '', dbStatus: 'draft',
+  firstName: '', lastName: '', patronymic: '', gender: 'FEMALE',
+  city: '', phone: '',
+  position: '', salary: '', workMode: 'Офис',
+  experience: '0', education: 'Высшее', educationInstitution: '', educationYears: '',
+  workExperiences: [],
+  activityAreas: [], skills: [], purchaseTypes: [],
+  specialStatuses: [],
+  tests: [],
+  about: '',
 });
+
+type DictOption = { id: string; value: string; label: string };
+
+function PositionAutocomplete({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [positions, setPositions] = useState<DictOption[]>([]);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(value);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch('/api/dict?category=POSITION').then(r => r.json()).then(setPositions).catch(() => {});
+  }, []);
+
+  useEffect(() => { setQuery(value); }, [value]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const filtered = positions.filter(p => p.label.toLowerCase().includes(query.toLowerCase()));
+
+  return (
+    <div ref={ref} className="relative">
+      <input
+        value={query}
+        onChange={e => { setQuery(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        placeholder="Начните вводить должность..."
+        className="w-full rounded-lg border border-slate-200 bg-white text-sm text-slate-800 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+      {open && filtered.length > 0 && (
+        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+          {filtered.map(p => (
+            <button key={p.id} type="button"
+              className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 transition"
+              onMouseDown={() => { onChange(p.label); setQuery(p.label); setOpen(false); }}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TagsSelect({ label, category, selected, onChange }: { label: string; category: string; selected: string[]; onChange: (v: string[]) => void }) {
+  const [options, setOptions] = useState<DictOption[]>([]);
+  useEffect(() => {
+    fetch(`/api/dict?category=${category}`).then(r => r.json()).then(setOptions).catch(() => {});
+  }, [category]);
+  const toggle = (v: string) => onChange(selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v]);
+  return (
+    <div>
+      <label className="text-xs font-medium text-slate-600 mb-2 block">{label}</label>
+      <div className="flex flex-wrap gap-2">
+        {options.map(o => (
+          <button key={o.id} type="button" onClick={() => toggle(o.value)}
+            className={`px-3 py-1 rounded-full text-xs border transition ${selected.includes(o.value) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400'}`}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const defaultResume = (_id: string, _position: string): ResumeFormFull => emptyForm();
 
 type ImportedResume = {
   source: 'hh' | 'avito';
@@ -306,151 +398,204 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function MyResume() {
-  const [resumes, setResumes] = useState<ResumeForm[]>([defaultResume('r1', '')]);
-  const [active, setActive] = useState('r1');
+  const [form, setForm] = useState<ResumeFormFull>(emptyForm());
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetch('/api/resumes')
-      .then(r => r.json())
+    fetch('/api/resumes').then(r => r.json())
       .then((data: import('@/lib/types').Resume[]) => {
         if (data.length > 0) {
           const r = data[0];
-          setResumes([{
-            id: 'r1', dbId: r.id,
-            position: r.position,
-            city: r.city,
-            salary: r.salary ? String(r.salary) : '',
-            experience: String(r.experience),
-            education: r.education,
-            workMode: r.workMode,
-            about: r.about ?? '',
-            dbStatus: r.status,
-          }]);
+          setForm({
+            dbId: r.id, dbStatus: r.status,
+            firstName: r.firstName, lastName: r.lastName, patronymic: r.patronymic ?? '', gender: r.gender,
+            city: r.city, phone: '',
+            position: r.position, salary: r.salary ? String(r.salary) : '', workMode: r.workMode,
+            experience: String(r.experience), education: r.education,
+            educationInstitution: r.educationInstitution ?? '', educationYears: r.educationYears ?? '',
+            workExperiences: r.workExperiences.map(w => ({
+              _id: String(w.id), company: w.company, role: w.role,
+              fromMonth: w.from, toMonth: w.to === 'по настоящее время' ? '' : w.to,
+              isCurrent: w.to === 'по настоящее время', description: w.description,
+            })),
+            activityAreas: r.activityAreas,
+            skills: r.skills,
+            purchaseTypes: r.purchaseTypes,
+            specialStatuses: r.specialStatuses.map(s => ({
+              value: s.value, docDate: s.docDate, docNumber: s.docNumber,
+              documentRef: s.documentRef, disabilityGroup: s.disabilityGroup,
+            })),
+            tests: r.tests.map(t => ({ value: t.value, passedAt: t.passedAt ?? '' })),
+            about: r.about,
+          });
         }
       })
       .catch(() => {});
+    fetch('/api/users/me').then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setForm(f => ({ ...f, phone: d.phone ?? '' })); })
+      .catch(() => {});
   }, []);
 
-  const form = resumes.find(r => r.id === active)!;
-  const upd = (k: string, v: string) => {
-    setResumes(prev => prev.map(r => r.id === active ? { ...r, [k]: v } : r));
-    setSaved(false);
-  };
-  const addResume = () => {
-    const id = `r${Date.now()}`;
-    const newR = defaultResume(id, 'Новая специализация');
-    setResumes(prev => [...prev, newR]);
-    setActive(id);
-    setSaved(false);
-  };
-
-  const importResume = (r: ImportedResume) => {
-    const id = `r${Date.now()}`;
-    const workModeMap: Record<string, string> = { remote: 'remote', hybrid: 'hybrid', office: 'office' };
-    const eduMap: Record<string, string> = { higher: 'higher', secondary_special: 'secondary_special' };
-    const newR: ResumeForm = {
-      id, dbId: '',
-      position: r.position,
-      city: r.city,
-      salary: r.salaryFrom ? String(r.salaryFrom) : '',
-      experience: r.experience,
-      education: eduMap[r.education] ?? 'higher',
-      workMode: workModeMap[r.workMode] ?? 'office',
-      about: [r.about, r.skills.length ? `Навыки: ${r.skills.join(', ')}` : ''].filter(Boolean).join('\n\n'),
-      dbStatus: 'draft',
-    };
-    setResumes(prev => [...prev, newR]);
-    setActive(id);
-    setSaved(false);
-  };
-  const removeResume = (id: string) => {
-    if (resumes.length === 1) return;
-    setResumes(prev => prev.filter(r => r.id !== id));
-    setActive(resumes.find(r => r.id !== id)?.id ?? 'r1');
-  };
+  const upd = (k: keyof ResumeFormFull, v: unknown) => { setForm(f => ({ ...f, [k]: v })); setSaved(false); };
 
   const saveToDb = async (newStatus?: string) => {
     if (!form.dbId) return;
     setSaving(true);
     try {
       const body: Record<string, unknown> = {
-        position: form.position,
-        city: form.city,
-        salary: form.salary || null,
-        experience: form.experience,
-        education: form.education,
-        workMode: form.workMode,
-        about: form.about,
+        firstName: form.firstName, lastName: form.lastName, patronymic: form.patronymic,
+        gender: form.gender,
+        position: form.position, city: form.city,
+        salary: form.salary || null, experience: form.experience,
+        education: form.education, educationInstitution: form.educationInstitution,
+        educationYears: form.educationYears, workMode: form.workMode, about: form.about,
+        workExperiences: form.workExperiences.map(w => ({
+          company: w.company, role: w.role, fromMonth: w.fromMonth,
+          toMonth: w.isCurrent ? null : w.toMonth || null,
+          isCurrent: w.isCurrent, description: w.description,
+        })),
+        specialStatuses: form.specialStatuses,
+        activityAreas: form.activityAreas,
+        skills: form.skills,
+        purchaseTypes: form.purchaseTypes,
+        tests: form.tests,
       };
       if (newStatus) body.status = newStatus;
       const res = await fetch(`/api/resumes/${form.dbId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
       if (res.ok) {
         const data = await res.json();
-        setResumes(prev => prev.map(r => r.id === active ? { ...r, dbStatus: data.status } : r));
+        setForm(f => ({ ...f, dbStatus: data.status }));
         setSaved(true);
       }
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
+  };
+
+  const addWorkExp = () => upd('workExperiences', [...form.workExperiences, {
+    _id: String(Date.now()), company: '', role: '', fromMonth: '', toMonth: '', isCurrent: false, description: '',
+  }]);
+  const updWorkExp = (idx: number, k: keyof WorkExpEntry, v: unknown) => {
+    const next = form.workExperiences.map((w, i) => i === idx ? { ...w, [k]: v } : w);
+    upd('workExperiences', next);
+  };
+  const removeWorkExp = (idx: number) => upd('workExperiences', form.workExperiences.filter((_, i) => i !== idx));
+
+  const toggleSpecialStatus = (value: string) => {
+    const has = form.specialStatuses.find(s => s.value === value);
+    if (has) upd('specialStatuses', form.specialStatuses.filter(s => s.value !== value));
+    else upd('specialStatuses', [...form.specialStatuses, { value, docDate: '', docNumber: '', documentRef: '', disabilityGroup: '' }]);
+  };
+  const updSpecialStatus = (value: string, k: keyof SpecialStatusEntry, v: string) => {
+    upd('specialStatuses', form.specialStatuses.map(s => s.value === value ? { ...s, [k]: v } : s));
+  };
+
+  const getTest = (value: string) => form.tests.find(t => t.value === value);
+  const toggleTest = (value: string, passedAt: string) => {
+    const has = form.tests.find(t => t.value === value);
+    if (has) upd('tests', form.tests.map(t => t.value === value ? { ...t, passedAt } : t));
+    else upd('tests', [...form.tests, { value, passedAt }]);
+  };
+
+  const TEST_LINKS: Record<string, string> = {
+    etp_zakaz_rf: 'https://zakaz.rf/education',
+    test_44fz_customer: 'https://zakaz.rf/test/44fz-customer',
+    test_44fz_supplier: 'https://zakaz.rf/test/44fz-supplier',
+    test_223fz_customer: 'https://zakaz.rf/test/223fz-customer',
+    test_223fz_supplier: 'https://zakaz.rf/test/223fz-supplier',
+  };
+
+  const SPECIAL_STATUS_LABELS: Record<string, string> = {
+    svo_participant: 'Участник СВО', svo_family: 'Член семьи участника СВО', disabled: 'Человек с ОВЗ',
   };
 
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-xl font-bold text-slate-800">Мои резюме</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Ваше резюме для работодателей</p>
+          <h1 className="text-xl font-bold text-slate-800">Моё резюме</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Ваш профиль для работодателей</p>
         </div>
-        {!resumes.some(r => r.dbId) && (
-          <Btn variant="primary" size="sm" onClick={addResume}>+ Добавить резюме</Btn>
+        {form.dbStatus && (
+          <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_COLORS[form.dbStatus] ?? 'text-slate-500 bg-slate-100'}`}>
+            {STATUS_LABELS[form.dbStatus] ?? form.dbStatus}
+          </span>
         )}
       </div>
 
-      <ResumeImportPanel onImport={importResume} />
+      <ResumeImportPanel onImport={r => {
+        setForm(f => ({
+          ...f,
+          position: r.position || f.position,
+          city: r.city || f.city,
+          salary: r.salaryFrom ? String(r.salaryFrom) : f.salary,
+          experience: r.experience || f.experience,
+          education: r.education || f.education,
+          workMode: r.workMode || f.workMode,
+          about: [r.about, r.skills.length ? `Навыки: ${r.skills.join(', ')}` : ''].filter(Boolean).join('\n\n') || f.about,
+        }));
+        setSaved(false);
+      }} />
 
-      {/* Resume tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
-        {resumes.map(r => (
-          <div key={r.id} className={`flex items-center gap-1.5 flex-shrink-0 px-3 py-1.5 rounded-lg border text-sm cursor-pointer transition ${active === r.id ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}
-            onClick={() => setActive(r.id)}>
-            <span className="truncate max-w-[140px]">{r.position}</span>
-            {resumes.length > 1 && (
-              <button onClick={e => { e.stopPropagation(); removeResume(r.id); }}
-                className="text-slate-400 hover:text-red-500 transition ml-1 text-xs leading-none">×</button>
-            )}
-          </div>
-        ))}
-      </div>
+      <div className="space-y-4 mt-4">
 
-      <div className="space-y-5">
+        {/* Block 1 — Общая информация */}
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-          <h3 className="text-sm font-semibold text-slate-800 mb-4">Основная информация</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="sm:col-span-2">
-              <label className="text-xs font-medium text-slate-600 mb-1 block">Желаемая должность</label>
-              <Input value={form.position} onChange={v => upd('position', v)} placeholder="Специалист по закупкам" />
+          <h3 className="text-sm font-semibold text-slate-800 mb-4">Общая информация</h3>
+          <div className="flex gap-4 mb-4 items-start">
+            <div className="flex-shrink-0">
+              <Avatar name={[form.firstName, form.lastName].filter(Boolean).join(' ')} size="xl" />
+              <p className="text-xs text-slate-400 mt-1 text-center">Фото</p>
             </div>
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-600 mb-1 block">Фамилия</label>
+                <Input value={form.lastName} onChange={v => upd('lastName', v)} placeholder="Иванова" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600 mb-1 block">Имя</label>
+                <Input value={form.firstName} onChange={v => upd('firstName', v)} placeholder="Мария" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600 mb-1 block">Отчество</label>
+                <Input value={form.patronymic} onChange={v => upd('patronymic', v)} placeholder="Ивановна" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600 mb-1 block">Пол</label>
+                <Select value={form.gender} onChange={v => upd('gender', v)}
+                  options={[{ value: 'FEMALE', label: 'Женский' }, { value: 'MALE', label: 'Мужской' }]} />
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Город</label>
               <Input value={form.city} onChange={v => upd('city', v)} placeholder="Москва" />
             </div>
             <div>
+              <label className="text-xs font-medium text-slate-600 mb-1 block">Телефон</label>
+              <Input value={form.phone} onChange={v => upd('phone', v)} placeholder="+7 (900) 000-00-00" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600 mb-1 block">Email</label>
+              <Input value="" onChange={() => {}} disabled placeholder="из профиля" />
+            </div>
+          </div>
+        </div>
+
+        {/* Block 2 — Требования к работе */}
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-slate-800 mb-4">Требования к работе</h3>
+          <div className="mb-3">
+            <label className="text-xs font-medium text-slate-600 mb-1 block">Желаемая должность</label>
+            <PositionAutocomplete value={form.position} onChange={v => upd('position', v)} />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Желаемая зарплата, ₽</label>
               <Input value={form.salary} onChange={v => upd('salary', v)} placeholder="90 000" type="number" />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-slate-600 mb-1 block">Опыт работы (лет)</label>
-              <Input value={form.experience} onChange={v => upd('experience', v)} placeholder="5" type="number" />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-slate-600 mb-1 block">Образование</label>
-              <Select value={form.education} onChange={v => upd('education', v)} options={DICTIONARIES.educations} />
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Режим работы</label>
@@ -459,34 +604,189 @@ export function MyResume() {
           </div>
         </div>
 
+        {/* Block 3 — Образование */}
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-          <h3 className="text-sm font-semibold text-slate-800 mb-3">О себе</h3>
-          <textarea
-            value={form.about} onChange={e => upd('about', e.target.value)} rows={5}
-            placeholder="Расскажите о своём опыте и навыках..."
-            className="w-full rounded-lg border border-slate-200 text-sm px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-          />
+          <h3 className="text-sm font-semibold text-slate-800 mb-4">Образование</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-slate-600 mb-1 block">Уровень образования</label>
+              <Select value={form.education} onChange={v => upd('education', v)} options={DICTIONARIES.educations} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600 mb-1 block">Годы обучения</label>
+              <Input value={form.educationYears} onChange={v => upd('educationYears', v)} placeholder="2010–2015" />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs font-medium text-slate-600 mb-1 block">Учебное заведение</label>
+              <Input value={form.educationInstitution} onChange={v => upd('educationInstitution', v)} placeholder="МГУ им. Ломоносова" />
+            </div>
+          </div>
         </div>
 
-        <div className="flex justify-between gap-2 items-center flex-wrap">
+        {/* Block 4 — Опыт работы */}
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-slate-800">Опыт работы</h3>
+            <Btn variant="ghost" size="sm" onClick={addWorkExp}>+ Добавить</Btn>
+          </div>
+          <div className="mb-3">
+            <label className="text-xs font-medium text-slate-600 mb-1 block">Общий стаж (лет)</label>
+            <Input value={form.experience} onChange={v => upd('experience', v)} placeholder="5" type="number" className="max-w-[120px]" />
+          </div>
+          {form.workExperiences.length === 0 && (
+            <p className="text-xs text-slate-400">Не добавлено. Нажмите «+ Добавить» для конкретного места работы.</p>
+          )}
+          <div className="space-y-3">
+            {form.workExperiences.map((w, idx) => (
+              <div key={w._id} className="border border-slate-200 rounded-lg p-3 space-y-2 relative">
+                <button onClick={() => removeWorkExp(idx)}
+                  className="absolute top-2 right-2 text-slate-300 hover:text-red-400 text-xs">✕</button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 mb-0.5 block">Организация</label>
+                    <Input value={w.company} onChange={v => updWorkExp(idx, 'company', v)} placeholder="ООО «Ромашка»" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 mb-0.5 block">Должность</label>
+                    <Input value={w.role} onChange={v => updWorkExp(idx, 'role', v)} placeholder="Специалист по закупкам" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 mb-0.5 block">С (мм.гггг)</label>
+                    <Input value={w.fromMonth} onChange={v => updWorkExp(idx, 'fromMonth', v)} placeholder="01.2020" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 mb-0.5 block">По (мм.гггг)</label>
+                    <Input value={w.isCurrent ? '' : w.toMonth} onChange={v => updWorkExp(idx, 'toMonth', v)} placeholder="01.2024" disabled={w.isCurrent} />
+                    <label className="flex items-center gap-1.5 mt-1 cursor-pointer">
+                      <input type="checkbox" checked={w.isCurrent} onChange={e => updWorkExp(idx, 'isCurrent', e.target.checked)} className="rounded border-slate-300 w-3.5 h-3.5" />
+                      <span className="text-xs text-slate-500">По настоящее время</span>
+                    </label>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="text-xs font-medium text-slate-500 mb-0.5 block">Описание обязанностей</label>
+                    <textarea value={w.description} onChange={e => updWorkExp(idx, 'description', e.target.value)} rows={2}
+                      className="w-full rounded-lg border border-slate-200 text-xs px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Block 5 — Сферы и навыки */}
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 space-y-4">
+          <h3 className="text-sm font-semibold text-slate-800">Сферы и навыки</h3>
+          <TagsSelect label="Сфера деятельности заказчика" category="ACTIVITY_AREA" selected={form.activityAreas} onChange={v => upd('activityAreas', v)} />
+          <TagsSelect label="Области закупок" category="PURCHASE_TYPE" selected={form.purchaseTypes} onChange={v => upd('purchaseTypes', v)} />
+          <TagsSelect label="Профессиональные навыки" category="SKILL" selected={form.skills} onChange={v => upd('skills', v)} />
+        </div>
+
+        {/* Block 6 — Особые статусы */}
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-slate-800 mb-1">Особые статусы</h3>
+          <p className="text-xs text-slate-400 mb-4">Отображаются в резюме только после подтверждения администратором</p>
+          <div className="space-y-3">
+            {(['svo_participant', 'svo_family', 'disabled'] as const).map(val => {
+              const active = form.specialStatuses.find(s => s.value === val);
+              return (
+                <div key={val}>
+                  <label className="flex items-center gap-2 cursor-pointer mb-2">
+                    <input type="checkbox" checked={!!active} onChange={() => toggleSpecialStatus(val)}
+                      className="rounded border-slate-300 w-4 h-4 text-blue-600" />
+                    <span className="text-sm text-slate-700 font-medium">{SPECIAL_STATUS_LABELS[val]}</span>
+                  </label>
+                  {active && (
+                    <div className={`ml-6 grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200`}>
+                      <div>
+                        <label className="text-xs font-medium text-slate-500 mb-0.5 block">Дата справки</label>
+                        <Input value={active.docDate} onChange={v => updSpecialStatus(val, 'docDate', v)} placeholder="01.01.2024" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-slate-500 mb-0.5 block">Номер справки</label>
+                        <Input value={active.docNumber} onChange={v => updSpecialStatus(val, 'docNumber', v)} placeholder="№ 12345" />
+                      </div>
+                      {val === 'disabled' && (
+                        <div>
+                          <label className="text-xs font-medium text-slate-500 mb-0.5 block">Группа инвалидности</label>
+                          <Select value={active.disabilityGroup} onChange={v => updSpecialStatus(val, 'disabilityGroup', v)}
+                            options={[{ value: '1', label: 'I группа' }, { value: '2', label: 'II группа' }, { value: '3', label: 'III группа' }]} />
+                        </div>
+                      )}
+                      <div className={val === 'disabled' ? '' : 'sm:col-span-2'}>
+                        <label className="text-xs font-medium text-slate-500 mb-0.5 block">Ссылка / реквизиты документа</label>
+                        <Input value={active.documentRef} onChange={v => updSpecialStatus(val, 'documentRef', v)} placeholder="Файл или описание" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Block 7 — Квалификационные маркеры */}
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-slate-800 mb-4">Квалификация и тесты</h3>
+          <div className="space-y-3">
+            {[
+              { value: 'etp_zakaz_rf', label: 'Курс повышения квалификации ЭТП ЗаказРФ', type: 'course' as const },
+              { value: 'test_44fz_customer', label: 'Тест: 44-ФЗ для заказчиков', type: 'test' as const },
+              { value: 'test_44fz_supplier', label: 'Тест: 44-ФЗ для поставщиков', type: 'test' as const },
+              { value: 'test_223fz_customer', label: 'Тест: 223-ФЗ для заказчиков', type: 'test' as const },
+              { value: 'test_223fz_supplier', label: 'Тест: 223-ФЗ для поставщиков', type: 'test' as const },
+            ].map(item => {
+              const entry = getTest(item.value);
+              const passed = entry && entry.passedAt;
+              return (
+                <div key={item.value} className="flex items-center justify-between gap-3 py-2 border-b border-slate-100 last:border-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {passed
+                      ? <span className="text-emerald-500 text-base flex-shrink-0">✓</span>
+                      : <span className="text-slate-300 text-base flex-shrink-0">○</span>}
+                    <span className="text-sm text-slate-700 truncate">{item.label}</span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {passed ? (
+                      <button onClick={() => toggleTest(item.value, '')}
+                        className="text-xs text-slate-400 hover:text-red-400 transition">Снять</button>
+                    ) : (
+                      <>
+                        <a href={TEST_LINKS[item.value]} target="_blank" rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:underline">
+                          {item.type === 'course' ? 'Пройти курс' : 'Пройти тест'} →
+                        </a>
+                        <button onClick={() => toggleTest(item.value, new Date().toISOString())}
+                          className="text-xs text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded hover:bg-emerald-50 transition">
+                          Отметить как пройденный
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* О себе */}
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-slate-800 mb-3">О себе</h3>
+          <textarea value={form.about} onChange={e => upd('about', e.target.value)} rows={5}
+            placeholder="Расскажите о своём опыте и навыках..."
+            className="w-full rounded-lg border border-slate-200 text-sm px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+        </div>
+
+        {/* Actions */}
+        <div className="flex justify-between gap-2 items-center flex-wrap pb-4">
           <div className="flex items-center gap-2">
-            {form.dbStatus && (
-              <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_COLORS[form.dbStatus] ?? 'text-slate-500 bg-slate-100'}`}>
-                {STATUS_LABELS[form.dbStatus] ?? form.dbStatus}
-              </span>
-            )}
             {saved && <span className="text-sm text-emerald-600">✓ Сохранено</span>}
           </div>
           <div className="flex gap-2">
             {form.dbId && form.dbStatus === 'draft' && (
-              <Btn variant="secondary" onClick={() => saveToDb('PENDING')} disabled={saving}>
-                Отправить на проверку
-              </Btn>
+              <Btn variant="secondary" onClick={() => saveToDb('PENDING')} disabled={saving}>Отправить на проверку</Btn>
             )}
             {form.dbId && form.dbStatus === 'pending' && (
-              <Btn variant="ghost" onClick={() => saveToDb('DRAFT')} disabled={saving}>
-                Снять с проверки
-              </Btn>
+              <Btn variant="ghost" onClick={() => saveToDb('DRAFT')} disabled={saving}>Снять с проверки</Btn>
             )}
             <Btn variant="primary" onClick={() => saveToDb()} disabled={saving || !form.dbId}>
               {saving ? 'Сохранение…' : 'Сохранить изменения'}

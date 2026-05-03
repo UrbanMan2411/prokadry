@@ -61,6 +61,7 @@ enum DictCategory {
   TEST
   SPECIAL_STATUS
   SKILL
+  PURCHASE_TYPE
 }
 
 enum AuditAction {
@@ -167,14 +168,16 @@ model Resume {
   city        String
   region      String
 
-  position    String
-  salary      Int?
-  experience  Int          @default(0)
-  education   String
-  workMode    String
-  about       String?
-  photoUrl    String?
-  hasPhoto    Boolean      @default(false)
+  position              String
+  salary                Int?
+  experience            Int          @default(0)
+  education             String
+  educationInstitution  String?
+  educationYears        String?
+  workMode              String
+  about                 String?
+  photoUrl              String?
+  hasPhoto              Boolean      @default(false)
 
   status      ResumeStatus @default(DRAFT)
   publishedAt DateTime?
@@ -244,8 +247,11 @@ model ResumeSpecialStatus {
   dictItemId  String
   dictItem    DictItem @relation(fields: [dictItemId], references: [id])
 
-  confirmedAt DateTime?
-  documentRef String?
+  confirmedAt     DateTime?
+  documentRef     String?
+  docDate         String?
+  docNumber       String?
+  disabilityGroup String?
 
   @@id([resumeId, dictItemId])
   @@index([dictItemId])

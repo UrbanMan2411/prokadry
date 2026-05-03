@@ -14,6 +14,22 @@ export interface WorkExperience {
   description: string;
 }
 
+export interface SpecialStatus {
+  value: string;
+  label: string;
+  confirmed: boolean;
+  docDate: string;
+  docNumber: string;
+  documentRef: string;
+  disabilityGroup: string;
+}
+
+export interface ResumeTest {
+  value: string;
+  label: string;
+  passedAt: string | null;
+}
+
 export interface Resume {
   id: string;
   firstName: string;
@@ -28,10 +44,14 @@ export interface Resume {
   salary: number | null;
   experience: number;
   education: string;
+  educationInstitution: string;
+  educationYears: string;
   workMode: string;
   activityAreas: string[];
-  tests: string[];
-  specialStatuses: string[];
+  skills: string[];
+  purchaseTypes: string[];
+  tests: ResumeTest[];
+  specialStatuses: SpecialStatus[];
   hasPhoto: boolean;
   photo: string | null;
   publishedAt: string;
