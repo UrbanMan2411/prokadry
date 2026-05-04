@@ -96,6 +96,7 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
     const poll = setInterval(() => {
       apiFetch('/api/messages').then(r => r?.ok ? r.json() : null).then(data => { if (data) setMessages(data); }).catch(() => {});
       apiFetch('/api/invitations').then(r => r?.ok ? r.json() : null).then(data => { if (data) setInvitations(data); }).catch(() => {});
+      apiFetch('/api/resumes').then(r => r?.ok ? r.json() : null).then(data => { if (data) setResumes(data); }).catch(() => {});
     }, 30000);
     return () => clearInterval(poll);
   }, []);

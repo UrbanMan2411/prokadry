@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Resume, Vacancy, Invitation, Message } from '@/lib/types';
 import { fmtSalary, fmtDate, fmtExp } from '@/lib/utils';
 import { Badge, Btn, Input, Select, Modal, Avatar, StarBtn, StatusBadge, StatCard, EmptyState } from './ui';
@@ -949,6 +949,7 @@ export function EmployerInvitations({ invitations, setInvitations }: { invitatio
   const [sortCol, setSortCol] = useState<InvSortCol>(null);
   const [sortDir, setSortDir] = useState<InvSortDir>('asc');
   const [sortClickCount, setSortClickCount] = useState<Record<string, number>>({});
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const respond = (id: string, status: 'accepted' | 'rejected') => {
     setInvitations?.(prev => prev.map(i => i.id === id ? { ...i, status } : i));
@@ -1057,32 +1058,65 @@ export function EmployerInvitations({ invitations, setInvitations }: { invitatio
             </thead>
             <tbody className="divide-y divide-slate-100">
               {displayed.map(inv => (
-                <tr key={inv.id} className="hover:bg-slate-50 transition">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <Avatar name={inv.candidateName} size="sm" />
-                      <span className="font-medium text-slate-800">{inv.candidateName.split(' ').slice(0, 2).join(' ')}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-slate-600 text-xs max-w-[180px]">
-                    <div className="truncate">{inv.vacancyTitle}</div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge color={inv.fromSeeker ? 'cyan' : 'blue'}>{inv.fromSeeker ? 'Отклик' : 'Приглашение'}</Badge>
-                  </td>
-                  <td className="px-4 py-3"><StatusBadge status={inv.status} /></td>
-                  <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">{fmtDate(inv.createdAt)}</td>
-                  <td className="px-4 py-3">
-                    {inv.fromSeeker && inv.status === 'sent' && (
-                      <div className="flex gap-1.5">
-                        <button onClick={() => respond(inv.id, 'accepted')}
-                          className="text-xs px-2.5 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition cursor-pointer">Принять</button>
-                        <button onClick={() => respond(inv.id, 'rejected')}
-                          className="text-xs px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition cursor-pointer">Отклонить</button>
+                <React.Fragment key={inv.id}>
+                  <tr className="hover:bg-slate-50 transition">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Avatar name={inv.candidateName} size="sm" />
+                        <span className="font-medium text-slate-800">{inv.candidateName.split(' ').slice(0, 2).join(' ')}</span>
                       </div>
-                    )}
-                  </td>
-                </tr>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600 text-xs max-w-[180px]">
+                      <div className="truncate">{inv.vacancyTitle}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge color={inv.fromSeeker ? 'cyan' : 'blue'}>{inv.fromSeeker ? 'Отклик' : 'Приглашение'}</Badge>
+                    </td>
+                    <td className="px-4 py-3"><StatusBadge status={inv.status} /></td>
+                    <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">{fmtDate(inv.createdAt)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1.5 flex-wrap items-center">
+                        {inv.fromSeeker && inv.status === 'sent' && (
+                          <>
+                            <button onClick={() => respond(inv.id, 'accepted')}
+                              className="text-xs px-2.5 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition cursor-pointer">Принять</button>
+                            <button onClick={() => respond(inv.id, 'rejected')}
+                              className="text-xs px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition cursor-pointer">Отклонить</button>
+                          </>
+                        )}
+                        {(inv.message || inv.replyMessage) && (
+                          <button
+                            onClick={() => setExpandedId(expandedId === inv.id ? null : inv.id)}
+                            className="text-xs px-2 py-1 rounded-lg border border-slate-200 text-slate-500 hover:border-blue-300 hover:text-blue-600 transition cursor-pointer"
+                          >
+                            {expandedId === inv.id ? '▲' : '▼'} Сообщение{inv.replyMessage ? ' (+ответ)' : ''}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                  {expandedId === inv.id && (
+                    <tr className="bg-slate-50">
+                      <td colSpan={6} className="px-6 py-3 space-y-2">
+                        {inv.message && inv.message !== 'Отклик соискателя' && (
+                          <div>
+                            <div className="text-xs font-semibold text-slate-500 mb-0.5">Сообщение работодателя:</div>
+                            <div className="text-sm text-slate-700 bg-white border border-slate-200 rounded-lg px-3 py-2">{inv.message}</div>
+                          </div>
+                        )}
+                        {inv.replyMessage && (
+                          <div>
+                            <div className="text-xs font-semibold text-slate-500 mb-0.5">Ответ кандидата:</div>
+                            <div className="text-sm text-slate-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">{inv.replyMessage}</div>
+                          </div>
+                        )}
+                        {inv.fromSeeker && !inv.replyMessage && (
+                          <div className="text-xs text-slate-400 italic">Кандидат откликнулся без сопроводительного письма</div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>

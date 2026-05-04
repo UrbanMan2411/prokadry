@@ -51,6 +51,7 @@ export async function GET(_req: NextRequest) {
       employerName: i.vacancy.employer.name,
       employerId: i.vacancy.employer.id,
       message: i.message,
+      replyMessage: i.replyMessage ?? undefined,
       status: i.status.toLowerCase() as Invitation['status'],
       createdAt: i.sentAt.toISOString(),
       fromSeeker: i.message === 'Отклик соискателя',

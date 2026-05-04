@@ -1453,6 +1453,20 @@ export function SeekerVacancyRegistry({ vacancies, invitations = [] }: { vacanci
     return init;
   });
 
+  // re-sync when parent invitations prop updates (initial load completes after mount)
+  useEffect(() => {
+    setApplyStatus(prev => {
+      const next = { ...prev };
+      for (const inv of invitations) {
+        if (!inv.fromSeeker) continue;
+        if (next[inv.vacancyId] === 'loading') continue;
+        if (inv.status === 'rejected') next[inv.vacancyId] = 'rejected';
+        else if (inv.status === 'sent' || inv.status === 'viewed' || inv.status === 'accepted') next[inv.vacancyId] = 'done';
+      }
+      return next;
+    });
+  }, [invitations]);
+
   const handleApply = async (vacancyId: string) => {
     setApplyStatus(prev => ({ ...prev, [vacancyId]: 'loading' }));
     try {

@@ -102,6 +102,8 @@ export function AdminResumes({ resumes, setResumes }: {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   const filtered = resumes.filter(r => {
     if (statusFilter && r.status !== statusFilter) return false;
@@ -114,9 +116,11 @@ export function AdminResumes({ resumes, setResumes }: {
     setResumes(prev => prev.map(r => r.id === id ? { ...r, status: 'active' } : r));
     fetch(`/api/resumes/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'ACTIVE' }) }).catch(() => {});
   };
-  const reject = (id: string) => {
-    setResumes(prev => prev.map(r => r.id === id ? { ...r, status: 'draft' } : r));
-    fetch(`/api/resumes/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'REJECTED' }) }).catch(() => {});
+  const reject = (id: string, reason: string) => {
+    setResumes(prev => prev.map(r => r.id === id ? { ...r, status: 'draft', rejectReason: reason || undefined } : r));
+    fetch(`/api/resumes/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'REJECTED', rejectReason: reason || null }) }).catch(() => {});
+    setRejectTarget(null);
+    setRejectReason('');
   };
 
   const confirmStatus = (resumeId: string, value: string, confirmed: boolean) => {
@@ -177,7 +181,7 @@ export function AdminResumes({ resumes, setResumes }: {
                   <td className="px-3 py-3">
                     <div className="flex gap-1.5 flex-wrap">
                       {r.status !== 'active' && <Btn size="xs" variant="primary" onClick={() => approve(r.id)}>Одобрить</Btn>}
-                      {r.status === 'active' && <Btn size="xs" variant="danger" onClick={() => reject(r.id)}>Отклонить</Btn>}
+                      {(r.status === 'active' || r.status === 'pending') && <Btn size="xs" variant="danger" onClick={() => { setRejectTarget(r.id); setRejectReason(''); }}>Отклонить</Btn>}
                       {r.specialStatuses.length > 0 && (
                         <Btn size="xs" variant="ghost" onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}>
                           Статусы {r.specialStatuses.some(s => !s.confirmed) ? '⚠' : '✓'}
@@ -213,6 +217,26 @@ export function AdminResumes({ resumes, setResumes }: {
           </tbody>
         </table>
       </div>
+
+      {rejectTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+            <h2 className="text-base font-bold text-slate-800 mb-1">Отклонить резюме</h2>
+            <p className="text-sm text-slate-500 mb-4">Укажите причину отклонения (необязательно — соискатель увидит её в своём профиле)</p>
+            <textarea
+              value={rejectReason}
+              onChange={e => setRejectReason(e.target.value)}
+              rows={3}
+              placeholder="Например: резюме содержит неполные данные..."
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none mb-4"
+            />
+            <div className="flex justify-end gap-2">
+              <Btn variant="ghost" onClick={() => { setRejectTarget(null); setRejectReason(''); }}>Отмена</Btn>
+              <Btn variant="danger" onClick={() => reject(rejectTarget, rejectReason)}>Отклонить</Btn>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

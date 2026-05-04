@@ -3,7 +3,7 @@ export type Role = 'employer' | 'seeker' | 'admin';
 export type ResumeStatus = 'active' | 'pending' | 'draft';
 export type VacancyStatus = 'active' | 'archived' | 'draft';
 export type InvitationStatus = 'sent' | 'viewed' | 'accepted' | 'rejected';
-export type EmployerStatus = 'approved' | 'pending';
+export type EmployerStatus = 'approved' | 'pending' | 'suspended';
 
 export interface WorkExperience {
   id: number;
@@ -105,6 +105,7 @@ export interface Invitation {
   employerName: string;
   employerId?: string;
   message: string;
+  replyMessage?: string;
   status: InvitationStatus;
   createdAt: string;
   fromSeeker?: boolean;
