@@ -222,10 +222,14 @@ export function AdminEmployers({ employers, setEmployers }: {
   employers: Employer[]; setEmployers: (fn: (prev: Employer[]) => Employer[]) => void;
 }) {
   const [search, setSearch] = useState('');
-  const filtered = employers.filter(e =>
-    e.name.toLowerCase().includes(search.toLowerCase()) ||
-    e.contactName.toLowerCase().includes(search.toLowerCase())
-  );
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'suspended'>('all');
+
+  const filtered = employers.filter(e => {
+    if (statusFilter !== 'all' && e.status !== statusFilter) return false;
+    if (search && !e.name.toLowerCase().includes(search.toLowerCase()) &&
+        !e.contactName.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
 
   const approve = (id: string) => {
     setEmployers(prev => prev.map(e => e.id === id ? { ...e, status: 'approved' } : e));
@@ -250,10 +254,19 @@ export function AdminEmployers({ employers, setEmployers }: {
         <h1 className="text-xl font-bold text-slate-800">Работодатели</h1>
         <p className="text-sm text-slate-500 mt-0.5">{employers.filter(e => e.status === 'approved').length} одобрено, {employers.filter(e => e.status === 'pending').length} ожидают</p>
       </div>
-      <div className="mb-4">
+      <div className="flex flex-wrap gap-3 mb-4 items-center">
         <Input value={search} onChange={setSearch} placeholder="Поиск по названию, контакту..."
           prefix={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>}
+          className="flex-1 min-w-48 max-w-xs"
         />
+        <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
+          {([['all', 'Все'], ['pending', 'Ожидают'], ['approved', 'Одобрены'], ['suspended', 'Заблокированы']] as const).map(([k, label]) => (
+            <button key={k} onClick={() => setStatusFilter(k)}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition ${statusFilter === k ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              {label}{k === 'pending' && employers.filter(e => e.status === 'pending').length > 0 ? ` (${employers.filter(e => e.status === 'pending').length})` : ''}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
         <table className="w-full text-sm">
@@ -273,7 +286,12 @@ export function AdminEmployers({ employers, setEmployers }: {
                 <td className="px-4 py-3 text-slate-600">{e.contactName}</td>
                 <td className="px-4 py-3 text-slate-400 text-xs">{e.email}</td>
                 <td className="px-4 py-3 text-center">
-                  <Badge color="blue">{e.vacancyCount}</Badge>
+                  <div className="flex items-center justify-center gap-1">
+                    <Badge color={e.vacancyCount === 0 ? 'slate' : 'blue'}>{e.vacancyCount}</Badge>
+                    {e.status === 'approved' && e.vacancyCount === 0 && (
+                      <span title="Одобрен, но нет вакансий" className="text-amber-400 text-xs">⚠</span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3"><StatusBadge status={e.status} /></td>
                 <td className="px-4 py-3">

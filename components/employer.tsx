@@ -259,26 +259,17 @@ export function EmployerVacancies({
         body: JSON.stringify(form),
       }).catch(() => {});
     } else {
-      try {
-        const res = await fetch('/api/vacancies', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
-        });
-        if (res.ok) {
-          const newV: Vacancy = await res.json();
-          setVacancies(prev => [newV, ...prev]);
-        } else {
-          throw new Error('Failed');
-        }
-      } catch {
-        const newV: Vacancy = {
-          ...form as Vacancy,
-          id: `VAC-${String(vacancies.length + 1).padStart(3, '0')}`,
-          employerId: '', employerName: '',
-          region: '', createdAt: new Date().toISOString().split('T')[0], skills: [],
-        };
+      const res = await fetch('/api/vacancies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      if (res.ok) {
+        const newV: Vacancy = await res.json();
         setVacancies(prev => [newV, ...prev]);
+      } else {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error ?? 'Не удалось создать вакансию. Попробуйте снова.');
       }
     }
     setEditing(null);
@@ -1058,6 +1049,27 @@ export function CompanyProfile() {
   const [empStatus, setEmpStatus] = useState('');
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
+  const [pwError, setPwError] = useState('');
+  const [pwSaved, setPwSaved] = useState(false);
+  const [pwSaving, setPwSaving] = useState(false);
+
+  const handlePasswordChange = async () => {
+    setPwError('');
+    if (!pwForm.current) { setPwError('Введите текущий пароль'); return; }
+    if (pwForm.next.length < 6) { setPwError('Минимум 6 символов'); return; }
+    if (pwForm.next !== pwForm.confirm) { setPwError('Пароли не совпадают'); return; }
+    setPwSaving(true);
+    try {
+      const res = await fetch('/api/users/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: pwForm.current, newPassword: pwForm.next }),
+      });
+      if (res.ok) { setPwForm({ current: '', next: '', confirm: '' }); setPwSaved(true); setTimeout(() => setPwSaved(false), 3000); }
+      else { const d = await res.json().catch(() => ({})); setPwError(d.error ?? 'Ошибка'); }
+    } finally { setPwSaving(false); }
+  };
 
   useEffect(() => {
     fetch('/api/employers/me')
@@ -1253,6 +1265,29 @@ export function CompanyProfile() {
               {saving ? 'Сохранение…' : 'Сохранить изменения'}
             </Btn>
           </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 md:p-6 mt-5">
+        <h3 className="text-sm font-semibold text-slate-800 mb-4">Смена пароля</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="text-xs font-medium text-slate-600 mb-1 block">Текущий пароль</label>
+            <Input value={pwForm.current} onChange={v => setPwForm(f => ({ ...f, current: v }))} type="password" placeholder="••••••" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-600 mb-1 block">Новый пароль</label>
+            <Input value={pwForm.next} onChange={v => setPwForm(f => ({ ...f, next: v }))} type="password" placeholder="••••••" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-600 mb-1 block">Повторите пароль</label>
+            <Input value={pwForm.confirm} onChange={v => setPwForm(f => ({ ...f, confirm: v }))} type="password" placeholder="••••••" />
+          </div>
+        </div>
+        {pwError && <p className="text-xs text-red-500 mt-2">{pwError}</p>}
+        <div className="flex items-center gap-3 mt-3">
+          {pwSaved && <span className="text-sm text-emerald-600">✓ Пароль изменён</span>}
+          <Btn variant="secondary" onClick={handlePasswordChange} disabled={pwSaving}>{pwSaving ? 'Сохранение…' : 'Изменить пароль'}</Btn>
         </div>
       </div>
     </div>

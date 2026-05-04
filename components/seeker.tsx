@@ -947,6 +947,14 @@ export function MyResume() {
         <div className="flex justify-between gap-2 items-center flex-wrap pb-4">
           <div className="flex items-center gap-2">
             {saved && <span className="text-sm text-emerald-600">✓ Сохранено</span>}
+            {form.dbId && (
+              <Btn variant="ghost" size="sm" onClick={() => window.print()}>
+                <svg className="w-4 h-4 mr-1 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                Печать
+              </Btn>
+            )}
           </div>
           <div className="flex gap-2">
             {form.dbId && (form.dbStatus === 'draft' || form.dbStatus === 'rejected') && (
@@ -966,7 +974,20 @@ export function MyResume() {
 }
 
 // ── Seeker Invitations ─────────────────────────────────────────────────────
+type EmployerPublicInfo = { name: string; region: string; city: string; description: string; website: string; phone: string; contactName: string };
+
 export function SeekerInvitations({ invitations, setInvitations }: { invitations: Invitation[]; setInvitations: React.Dispatch<React.SetStateAction<Invitation[]>> }) {
+  const [empModal, setEmpModal] = useState<EmployerPublicInfo | null>(null);
+  const [empLoading, setEmpLoading] = useState('');
+
+  const showEmployer = async (employerId: string) => {
+    setEmpLoading(employerId);
+    try {
+      const res = await fetch(`/api/employers/${employerId}`);
+      if (res.ok) setEmpModal(await res.json());
+    } finally { setEmpLoading(''); }
+  };
+
   useEffect(() => {
     const toView = invitations.filter(i => i.status === 'sent' && !i.fromSeeker);
     if (toView.length === 0) return;
@@ -1011,7 +1032,13 @@ export function SeekerInvitations({ invitations, setInvitations }: { invitations
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <div className="font-semibold text-slate-800">{inv.vacancyTitle}</div>
-                          <div className="text-sm text-blue-600">{inv.employerName}</div>
+                          <button
+                            className="text-sm text-blue-600 hover:underline text-left"
+                            onClick={() => inv.employerId && showEmployer(inv.employerId)}
+                            disabled={!inv.employerId || empLoading === inv.employerId}
+                          >
+                            {empLoading === inv.employerId ? 'Загрузка…' : inv.employerName}
+                          </button>
                           <p className="text-sm text-slate-500 mt-1 leading-relaxed">{inv.message}</p>
                         </div>
                         <div className="flex flex-col items-end gap-2 flex-shrink-0">
@@ -1056,6 +1083,50 @@ export function SeekerInvitations({ invitations, setInvitations }: { invitations
             </div>
           )}
         </>
+      )}
+
+      {empModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={() => setEmpModal(null)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-slate-100 flex items-start justify-between gap-3">
+              <h2 className="text-lg font-bold text-slate-800">{empModal.name}</h2>
+              <button onClick={() => setEmpModal(null)} className="text-slate-400 hover:text-slate-600 text-xl leading-none">✕</button>
+            </div>
+            <div className="p-5 space-y-3 text-sm text-slate-700">
+              {(empModal.city || empModal.region) && (
+                <div className="flex gap-2">
+                  <span className="text-slate-400 w-20 flex-shrink-0">Адрес</span>
+                  <span>{[empModal.city, empModal.region].filter(Boolean).join(', ')}</span>
+                </div>
+              )}
+              {empModal.contactName && (
+                <div className="flex gap-2">
+                  <span className="text-slate-400 w-20 flex-shrink-0">Контакт</span>
+                  <span>{empModal.contactName}</span>
+                </div>
+              )}
+              {empModal.phone && (
+                <div className="flex gap-2">
+                  <span className="text-slate-400 w-20 flex-shrink-0">Телефон</span>
+                  <a href={`tel:${empModal.phone}`} className="text-blue-600 hover:underline">{empModal.phone}</a>
+                </div>
+              )}
+              {empModal.website && (
+                <div className="flex gap-2">
+                  <span className="text-slate-400 w-20 flex-shrink-0">Сайт</span>
+                  <a href={empModal.website.startsWith('http') ? empModal.website : `https://${empModal.website}`}
+                    target="_blank" rel="noreferrer" className="text-blue-600 hover:underline truncate">{empModal.website}</a>
+                </div>
+              )}
+              {empModal.description && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">О компании</p>
+                  <p className="text-slate-600 whitespace-pre-line">{empModal.description}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -1337,13 +1408,25 @@ export function SeekerSettings() {
 }
 
 // ── Seeker Vacancy Registry ────────────────────────────────────────────────
-export function SeekerVacancyRegistry({ vacancies }: { vacancies: Vacancy[] }) {
+export function SeekerVacancyRegistry({ vacancies, invitations = [] }: { vacancies: Vacancy[]; invitations?: Invitation[] }) {
   const [search, setSearch] = useState('');
   const [sphere, setSphere] = useState('');
   const [activity, setActivity] = useState('');
   const [workMode, setWorkMode] = useState('');
-  const [applyStatus, setApplyStatus] = useState<Record<string, 'loading' | 'done' | 'error'>>({});
+  const [salaryMin, setSalaryMin] = useState('');
+  const [salaryMax, setSalaryMax] = useState('');
   const [modalVacancy, setModalVacancy] = useState<Vacancy | null>(null);
+
+  // pre-seed apply status from existing invitations
+  const [applyStatus, setApplyStatus] = useState<Record<string, 'loading' | 'done' | 'error' | 'rejected'>>(() => {
+    const init: Record<string, 'loading' | 'done' | 'error' | 'rejected'> = {};
+    for (const inv of invitations) {
+      if (!inv.fromSeeker) continue;
+      if (inv.status === 'rejected') init[inv.vacancyId] = 'rejected';
+      else if (inv.status === 'sent' || inv.status === 'viewed' || inv.status === 'accepted') init[inv.vacancyId] = 'done';
+    }
+    return init;
+  });
 
   const handleApply = async (vacancyId: string) => {
     setApplyStatus(prev => ({ ...prev, [vacancyId]: 'loading' }));
@@ -1366,6 +1449,8 @@ export function SeekerVacancyRegistry({ vacancies }: { vacancies: Vacancy[] }) {
     if (sphere && !v.clientSpheres?.includes(sphere)) return false;
     if (activity && !v.specialistActivities?.includes(activity)) return false;
     if (workMode && v.workMode !== workMode) return false;
+    if (salaryMin && v.salaryFrom && v.salaryFrom < Number(salaryMin)) return false;
+    if (salaryMax && v.salaryTo && v.salaryTo > Number(salaryMax)) return false;
     return true;
   });
 
@@ -1377,7 +1462,7 @@ export function SeekerVacancyRegistry({ vacancies }: { vacancies: Vacancy[] }) {
       </div>
 
       <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Должность, организация, город..."
             className="col-span-1 sm:col-span-2 lg:col-span-1 rounded-lg border border-slate-200 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -1396,6 +1481,12 @@ export function SeekerVacancyRegistry({ vacancies }: { vacancies: Vacancy[] }) {
             <option value="">Формат работы</option>
             {DICTIONARIES.workModes.map(m => <option key={m}>{m}</option>)}
           </select>
+          <div className="flex gap-2">
+            <input value={salaryMin} onChange={e => setSalaryMin(e.target.value)} type="number" placeholder="Зарплата от, ₽"
+              className="flex-1 rounded-lg border border-slate-200 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input value={salaryMax} onChange={e => setSalaryMax(e.target.value)} type="number" placeholder="до, ₽"
+              className="flex-1 rounded-lg border border-slate-200 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
         </div>
       </div>
 
@@ -1428,10 +1519,10 @@ export function SeekerVacancyRegistry({ vacancies }: { vacancies: Vacancy[] }) {
                 <Btn
                   variant={applyStatus[v.id] === 'done' ? 'secondary' : 'primary'}
                   size="sm"
-                  disabled={!!applyStatus[v.id]}
+                  disabled={applyStatus[v.id] === 'loading' || applyStatus[v.id] === 'done'}
                   onClick={e => { e.stopPropagation(); handleApply(v.id); }}
                 >
-                  {applyStatus[v.id] === 'loading' ? '...' : applyStatus[v.id] === 'done' ? 'Отклик отправлен' : applyStatus[v.id] === 'error' ? 'Ошибка' : 'Откликнуться'}
+                  {applyStatus[v.id] === 'loading' ? '...' : applyStatus[v.id] === 'done' ? 'Отклик отправлен' : applyStatus[v.id] === 'rejected' ? 'Откликнуться снова' : applyStatus[v.id] === 'error' ? 'Ошибка' : 'Откликнуться'}
                 </Btn>
               </div>
             </div>
@@ -1494,10 +1585,10 @@ export function SeekerVacancyRegistry({ vacancies }: { vacancies: Vacancy[] }) {
               <div className="pt-2">
                 <Btn
                   variant={applyStatus[modalVacancy.id] === 'done' ? 'secondary' : 'primary'}
-                  disabled={!!applyStatus[modalVacancy.id]}
+                  disabled={applyStatus[modalVacancy.id] === 'loading' || applyStatus[modalVacancy.id] === 'done'}
                   onClick={() => handleApply(modalVacancy.id)}
                 >
-                  {applyStatus[modalVacancy.id] === 'loading' ? '...' : applyStatus[modalVacancy.id] === 'done' ? 'Отклик отправлен' : applyStatus[modalVacancy.id] === 'error' ? 'Ошибка' : 'Откликнуться'}
+                  {applyStatus[modalVacancy.id] === 'loading' ? '...' : applyStatus[modalVacancy.id] === 'done' ? 'Отклик отправлен' : applyStatus[modalVacancy.id] === 'rejected' ? 'Откликнуться снова' : applyStatus[modalVacancy.id] === 'error' ? 'Ошибка' : 'Откликнуться'}
                 </Btn>
               </div>
             </div>

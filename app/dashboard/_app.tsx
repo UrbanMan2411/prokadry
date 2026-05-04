@@ -190,7 +190,7 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
         case 'my-resume':
           return <MyResume />;
         case 'seeker-vacancies':
-          return <SeekerVacancyRegistry vacancies={vacancies} />;
+          return <SeekerVacancyRegistry vacancies={vacancies} invitations={invitations} />;
         case 'seeker-map':
           return <SeekerMapSearch vacancies={vacancies} />;
         case 'seeker-invitations':

@@ -102,6 +102,7 @@ export interface Invitation {
   candidateName: string;
   vacancyTitle: string;
   employerName: string;
+  employerId?: string;
   message: string;
   status: InvitationStatus;
   createdAt: string;

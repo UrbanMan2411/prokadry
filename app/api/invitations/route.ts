@@ -35,7 +35,7 @@ export async function GET(_req: NextRequest) {
         vacancy: {
           select: {
             title: true,
-            employer: { select: { name: true } },
+            employer: { select: { id: true, name: true } },
           },
         },
       },
@@ -49,6 +49,7 @@ export async function GET(_req: NextRequest) {
       candidateName: `${i.resume.firstName} ${i.resume.lastName}`.trim(),
       vacancyTitle: i.vacancy.title,
       employerName: i.vacancy.employer.name,
+      employerId: i.vacancy.employer.id,
       message: i.message,
       status: i.status.toLowerCase() as Invitation['status'],
       createdAt: i.sentAt.toISOString(),
@@ -84,11 +85,23 @@ export async function POST(req: NextRequest) {
       });
       if (!vacancy) return NextResponse.json({ error: 'Vacancy not found' }, { status: 404 });
 
+      // Allow re-apply if previous invitation was rejected
+      const existingInv = await db.invitation.findFirst({
+        where: { resumeId: resume.id, vacancyId },
+        select: { id: true, status: true },
+      });
+      if (existingInv && existingInv.status !== 'REJECTED') {
+        return NextResponse.json({ error: 'Invitation already exists' }, { status: 409 });
+      }
+      if (existingInv) {
+        await db.invitation.delete({ where: { id: existingInv.id } });
+      }
+
       const row = await db.invitation.create({
         data: { resumeId: resume.id, vacancyId, message: 'Отклик соискателя', status: 'SENT' },
         include: {
           resume: { select: { firstName: true, lastName: true } },
-          vacancy: { select: { title: true, employer: { select: { name: true } } } },
+          vacancy: { select: { title: true, employer: { select: { id: true, name: true } } } },
         },
       });
 
@@ -110,6 +123,7 @@ export async function POST(req: NextRequest) {
         candidateName: `${row.resume.firstName} ${row.resume.lastName}`.trim(),
         vacancyTitle: row.vacancy.title,
         employerName: row.vacancy.employer.name,
+        employerId: row.vacancy.employer.id,
         message: row.message,
         status: row.status.toLowerCase() as Invitation['status'],
         createdAt: row.sentAt.toISOString(),
@@ -136,7 +150,7 @@ export async function POST(req: NextRequest) {
       data: { resumeId, vacancyId, message, status: 'SENT' },
       include: {
         resume: { select: { firstName: true, lastName: true, userId: true } },
-        vacancy: { select: { title: true, employer: { select: { name: true } } } },
+        vacancy: { select: { title: true, employer: { select: { id: true, name: true } } } },
       },
     });
 
@@ -152,6 +166,7 @@ export async function POST(req: NextRequest) {
       candidateName: `${row.resume.firstName} ${row.resume.lastName}`.trim(),
       vacancyTitle: row.vacancy.title,
       employerName: row.vacancy.employer.name,
+      employerId: row.vacancy.employer.id,
       message: row.message,
       status: row.status.toLowerCase() as Invitation['status'],
       createdAt: row.sentAt.toISOString(),

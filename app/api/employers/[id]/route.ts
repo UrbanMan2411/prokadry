@@ -3,6 +3,37 @@ import { db } from '@/lib/db';
 import { getSession } from '@/lib/session';
 import { logAction } from '@/lib/audit';
 
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await params;
+    const session = await getSession();
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const emp = await db.employer.findUnique({
+      where: { id },
+      select: { name: true, region: true, city: true, description: true, website: true, phone: true, contactName: true, status: true },
+    });
+    if (!emp) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    return NextResponse.json({
+      name: emp.name,
+      region: emp.region,
+      city: emp.city,
+      description: emp.description ?? '',
+      website: emp.website ?? '',
+      phone: emp.phone,
+      contactName: emp.contactName,
+      status: emp.status.toLowerCase(),
+    });
+  } catch (err) {
+    console.error('[api/employers/[id] GET]', err);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
