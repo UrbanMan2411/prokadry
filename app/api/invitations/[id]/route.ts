@@ -9,18 +9,9 @@ export async function PATCH(
   try {
     const { id } = await params;
     const session = await getSession();
-    if (!session || session.role !== 'SEEKER') {
+    if (!session || (session.role !== 'SEEKER' && session.role !== 'EMPLOYER')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const resume = await db.resume.findUnique({
-      where: { userId: session.userId },
-      select: { id: true },
-    });
-    if (!resume) return NextResponse.json({ error: 'Resume not found' }, { status: 404 });
-
-    const existing = await db.invitation.findFirst({ where: { id, resumeId: resume.id } });
-    if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     const { status } = await req.json();
     const dbStatus = String(status).toUpperCase();
@@ -28,12 +19,21 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
     }
 
+    if (session.role === 'SEEKER') {
+      const resume = await db.resume.findUnique({ where: { userId: session.userId }, select: { id: true } });
+      if (!resume) return NextResponse.json({ error: 'Resume not found' }, { status: 404 });
+      const existing = await db.invitation.findFirst({ where: { id, resumeId: resume.id } });
+      if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    } else {
+      const emp = await db.employer.findUnique({ where: { userId: session.userId }, select: { id: true } });
+      if (!emp) return NextResponse.json({ error: 'Employer not found' }, { status: 404 });
+      const existing = await db.invitation.findFirst({ where: { id, vacancy: { employerId: emp.id } } });
+      if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
     const updated = await db.invitation.update({
       where: { id },
-      data: {
-        status: dbStatus as 'ACCEPTED' | 'REJECTED',
-        respondedAt: new Date(),
-      },
+      data: { status: dbStatus as 'ACCEPTED' | 'REJECTED', respondedAt: new Date() },
     });
 
     return NextResponse.json({ id: updated.id, status: updated.status.toLowerCase() });

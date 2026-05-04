@@ -163,7 +163,7 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
             fetch(`/api/messages/${id}`, { method: 'PATCH' }).catch(() => {});
           }} />;
         case 'invitations':
-          return <EmployerInvitations invitations={invitations} />;
+          return <EmployerInvitations invitations={invitations} setInvitations={setInvitations} />;
         case 'company':
           return <CompanyProfile />;
       }

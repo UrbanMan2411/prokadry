@@ -961,13 +961,24 @@ type ChatMsg = { id: string; fromMe: boolean; text: string; ts: string };
 type Thread  = { id: string; name: string; msgs: ChatMsg[]; unread: boolean; counterpartyUserId: string };
 
 function buildSeekerThreads(messages: Message[]): Thread[] {
-  return messages.map(m => ({
-    id: m.id,
-    name: m.fromRole === 'employer' ? m.fromName : m.toName,
-    msgs: [{ id: m.id, fromMe: m.fromRole === 'candidate', text: m.text, ts: m.createdAt }],
-    unread: !m.isRead,
-    counterpartyUserId: m.counterpartyUserId,
-  }));
+  const map = new Map<string, Thread>();
+  for (const m of [...messages].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
+    const cpId = m.counterpartyUserId;
+    if (!cpId) continue;
+    if (!map.has(cpId)) {
+      map.set(cpId, {
+        id: cpId,
+        name: m.fromRole === 'employer' ? m.fromName : m.toName,
+        msgs: [],
+        unread: false,
+        counterpartyUserId: cpId,
+      });
+    }
+    const t = map.get(cpId)!;
+    t.msgs.push({ id: m.id, fromMe: m.fromRole === 'candidate', text: m.text, ts: m.createdAt });
+    if (!m.isRead && m.fromRole === 'employer') t.unread = true;
+  }
+  return Array.from(map.values());
 }
 
 export function SeekerMessages({ messages, onMarkRead }: { messages: Message[]; onMarkRead?: (id: string) => void }) {

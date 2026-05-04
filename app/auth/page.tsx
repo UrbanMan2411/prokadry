@@ -105,11 +105,6 @@ function SignInForm({ onSwitchTab }: { onSwitchTab: () => void }) {
       <Field label="Email" name="email" type="email" placeholder="you@example.com" autoComplete="email" />
       <div className="space-y-1">
         <PasswordField label="Пароль" name="password" placeholder="••••••••" autoComplete="current-password" />
-        <div className="text-right">
-          <button type="button" className="text-xs text-blue-600 hover:text-blue-700 transition cursor-pointer">
-            Забыли пароль?
-          </button>
-        </div>
       </div>
       {state?.error && (
         <div role="alert" className="px-3 py-2.5 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">

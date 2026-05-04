@@ -598,22 +598,26 @@ const AI_THREAD: Thread = {
 };
 
 function buildThreads(messages: Message[]): Thread[] {
-  return [
-    AI_THREAD,
-    ...messages.map((m, i) => ({
-      id: m.id,
-      name: m.fromRole === 'candidate' ? m.fromName : m.toName,
-      msgs: [{ id: m.id, fromMe: m.fromRole === 'employer', text: m.text, ts: m.createdAt }],
-      unread: !m.isRead,
-      contactState: 'hidden' as ContactState,
-      contactInfo: {
-        phone: `+7 (9${String(i * 7 % 100).padStart(2, '0')}) ${300 + i * 13}-${10 + i * 3 % 90}-${20 + i % 79}`,
-        email: `candidate${i + 1}@mail.ru`,
-        telegram: `@specialist_${i + 1}`,
-      },
-      counterpartyUserId: m.counterpartyUserId,
-    })),
-  ];
+  const map = new Map<string, Thread>();
+  for (const m of [...messages].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
+    const cpId = m.counterpartyUserId;
+    if (!cpId) continue;
+    if (!map.has(cpId)) {
+      map.set(cpId, {
+        id: cpId,
+        name: m.fromRole === 'candidate' ? m.fromName : m.toName,
+        msgs: [],
+        unread: false,
+        contactState: 'hidden',
+        contactInfo: { phone: '', email: '', telegram: '' },
+        counterpartyUserId: cpId,
+      });
+    }
+    const t = map.get(cpId)!;
+    t.msgs.push({ id: m.id, fromMe: m.fromRole === 'employer', text: m.text, ts: m.createdAt });
+    if (!m.isRead && m.fromRole === 'candidate') t.unread = true;
+  }
+  return [AI_THREAD, ...Array.from(map.values())];
 }
 
 export function EmployerMessages({ messages, onMarkRead }: { messages: Message[]; onMarkRead?: (id: string) => void }) {
@@ -861,12 +865,23 @@ function InvSortIcon({ col, sortCol, sortDir }: { col: InvSortCol; sortCol: InvS
   return <span className="ml-1 text-blue-500 text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>;
 }
 
-export function EmployerInvitations({ invitations }: { invitations: Invitation[] }) {
+export function EmployerInvitations({ invitations, setInvitations }: { invitations: Invitation[]; setInvitations?: React.Dispatch<React.SetStateAction<Invitation[]>> }) {
   const [statusFilter, setStatusFilter] = useState('');
   const [candidateSearch, setCandidateSearch] = useState('');
   const [sortCol, setSortCol] = useState<InvSortCol>(null);
   const [sortDir, setSortDir] = useState<InvSortDir>('asc');
   const [sortClickCount, setSortClickCount] = useState<Record<string, number>>({});
+
+  const respond = (id: string, status: 'accepted' | 'rejected') => {
+    setInvitations?.(prev => prev.map(i => i.id === id ? { ...i, status } : i));
+    fetch(`/api/invitations/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    }).catch(() => {
+      setInvitations?.(prev => prev.map(i => i.id === id ? { ...i, status: 'sent' } : i));
+    });
+  };
 
   const handleSort = (col: InvSortCol) => {
     if (!col) return;
@@ -948,8 +963,10 @@ export function EmployerInvitations({ invitations }: { invitations: Invitation[]
               <tr className="bg-slate-50 border-b border-slate-200">
                 <SortHeader col="candidateName" label="Кандидат" />
                 <SortHeader col="vacancyTitle" label="Вакансия" />
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Тип</th>
                 <SortHeader col="status" label="Статус" />
                 <SortHeader col="createdAt" label="Дата" />
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -964,8 +981,21 @@ export function EmployerInvitations({ invitations }: { invitations: Invitation[]
                   <td className="px-4 py-3 text-slate-600 text-xs max-w-[180px]">
                     <div className="truncate">{inv.vacancyTitle}</div>
                   </td>
+                  <td className="px-4 py-3">
+                    <Badge color={inv.fromSeeker ? 'cyan' : 'blue'}>{inv.fromSeeker ? 'Отклик' : 'Приглашение'}</Badge>
+                  </td>
                   <td className="px-4 py-3"><StatusBadge status={inv.status} /></td>
                   <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">{fmtDate(inv.createdAt)}</td>
+                  <td className="px-4 py-3">
+                    {inv.fromSeeker && inv.status === 'sent' && (
+                      <div className="flex gap-1.5">
+                        <button onClick={() => respond(inv.id, 'accepted')}
+                          className="text-xs px-2.5 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition cursor-pointer">Принять</button>
+                        <button onClick={() => respond(inv.id, 'rejected')}
+                          className="text-xs px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition cursor-pointer">Отклонить</button>
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
