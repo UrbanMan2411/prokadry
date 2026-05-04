@@ -232,6 +232,9 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
         onClose={() => setInviteOpen(false)}
         resume={inviteTarget}
         vacancies={vacancies}
+        onSent={() => {
+          fetch('/api/messages').then(r => r.ok ? r.json() : []).then(setMessages).catch(() => {});
+        }}
       />
       {renderPage()}
     </AppShell>

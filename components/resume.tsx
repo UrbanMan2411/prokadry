@@ -15,9 +15,9 @@ const TEMPLATES = [
 type Step = 1 | 2 | 'done';
 
 export function InviteModal({
-  open, onClose, resume, vacancies,
+  open, onClose, resume, vacancies, onSent,
 }: {
-  open: boolean; onClose: () => void; resume: Resume | null; vacancies: Vacancy[];
+  open: boolean; onClose: () => void; resume: Resume | null; vacancies: Vacancy[]; onSent?: () => void;
 }) {
   const [step, setStep] = useState<Step>(1);
   const [vacancyId, setVacancyId] = useState('');
@@ -167,6 +167,7 @@ export function InviteModal({
               }).catch(() => null);
               // 409 = already invited — treat as success
               if (res && !res.ok && res.status !== 409) return;
+              onSent?.();
             }
             setStep('done');
           }}>

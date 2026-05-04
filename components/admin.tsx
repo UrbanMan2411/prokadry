@@ -512,33 +512,63 @@ export function AdminDicts() {
 }
 
 // ── Admin Logs ─────────────────────────────────────────────────────────────
+const LOG_CATEGORIES: { label: string; match: (a: string) => boolean }[] = [
+  { label: 'Все', match: () => true },
+  { label: 'Резюме', match: a => a.startsWith('Резюме') },
+  { label: 'Работодатели', match: a => a.startsWith('Работодатель') },
+  { label: 'Вакансии', match: a => a.startsWith('Вакансия') },
+  { label: 'Пользователи', match: a => a.startsWith('Пользователь') || a.startsWith('Вход') || a.startsWith('Выход') },
+  { label: 'Система', match: a => a.startsWith('Справочник') || a.startsWith('Приглашение') || a.startsWith('Сообщение') },
+];
+
+const ROLE_FILTERS = ['Все', 'Администратор', 'Работодатель', 'Соискатель'];
+
 export function AdminLogs({ logs }: { logs: AuditLog[] }) {
   const [search, setSearch] = useState('');
-  const filtered = logs.filter(l =>
-    l.action.toLowerCase().includes(search.toLowerCase()) ||
-    l.user.toLowerCase().includes(search.toLowerCase())
-  );
+  const [category, setCategory] = useState(0);
+  const [role, setRole] = useState('Все');
+
+  const filtered = logs.filter(l => {
+    if (search && !l.action.toLowerCase().includes(search.toLowerCase()) && !l.user.toLowerCase().includes(search.toLowerCase())) return false;
+    if (!LOG_CATEGORIES[category].match(l.action)) return false;
+    if (role !== 'Все' && l.role !== role) return false;
+    return true;
+  });
 
   const actionColors: Record<string, string> = {
-    'Резюме добавлено': 'blue',
-    'Резюме одобрено': 'green',
-    'Резюме отклонено': 'red',
-    'Работодатель зарегистрирован': 'purple',
-    'Вакансия создана': 'cyan',
-    'Приглашение отправлено': 'amber',
-    'Сообщение отправлено': 'slate',
+    'Резюме добавлено': 'blue', 'Резюме одобрено': 'green', 'Резюме отклонено': 'red',
+    'Резюме архивировано': 'slate', 'Работодатель зарегистрирован': 'purple',
+    'Работодатель одобрен': 'green', 'Работодатель заблокирован': 'red',
+    'Вакансия создана': 'cyan', 'Вакансия архивирована': 'slate',
+    'Приглашение отправлено': 'amber', 'Сообщение отправлено': 'slate',
+    'Вход в систему': 'blue', 'Пользователь заблокирован': 'red',
+    'Пользователь разблокирован': 'green',
   };
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="mb-5">
         <h1 className="text-xl font-bold text-slate-800">Журнал событий</h1>
-        <p className="text-sm text-slate-500 mt-0.5">{logs.length} событий</p>
+        <p className="text-sm text-slate-500 mt-0.5">{filtered.length} из {logs.length} событий</p>
       </div>
-      <div className="mb-4">
-        <Input value={search} onChange={setSearch} placeholder="Поиск по действию, пользователю..."
-          prefix={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>}
-        />
+      <div className="flex flex-wrap gap-3 mb-4">
+        <div className="flex-1 min-w-48">
+          <Input value={search} onChange={setSearch} placeholder="Поиск по действию, пользователю..."
+            prefix={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>}
+          />
+        </div>
+        <select value={role} onChange={e => setRole(e.target.value)}
+          className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          {ROLE_FILTERS.map(r => <option key={r}>{r}</option>)}
+        </select>
+      </div>
+      <div className="flex flex-wrap gap-1.5 mb-4">
+        {LOG_CATEGORIES.map((c, i) => (
+          <button key={c.label} onClick={() => setCategory(i)}
+            className={`text-xs px-3 py-1.5 rounded-full border transition ${category === i ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'}`}>
+            {c.label}
+          </button>
+        ))}
       </div>
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
         <table className="w-full text-sm">

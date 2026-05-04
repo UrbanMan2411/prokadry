@@ -631,6 +631,7 @@ function buildThreads(messages: Message[]): Thread[] {
 export function EmployerMessages({ messages, onMarkRead }: { messages: Message[]; onMarkRead?: (id: string) => void }) {
   const [threads, setThreads] = useState<Thread[]>(() => buildThreads(messages));
   const [activeId, setActiveId] = useState<string | null>(null);
+  useEffect(() => { setThreads(buildThreads(messages)); }, [messages]);
   const [reply, setReply] = useState('');
   const [aiTyping, setAiTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -1072,7 +1073,7 @@ export function CompanyProfile() {
     setInnResult(null);
     try {
       const res = await fetch(`/api/inn-lookup?inn=${inn}`);
-      if (res.status === 503) { setInnLookupState('not_found'); return; }
+      if (res.status === 503) { setInnLookupState('error'); return; }
       if (res.status === 404) { setInnLookupState('not_found'); return; }
       if (!res.ok) { setInnLookupState('error'); return; }
       const d = await res.json();
