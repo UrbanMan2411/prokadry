@@ -5,7 +5,15 @@ import path from 'path';
 import os from 'os';
 
 function normalizeDatabaseUrl(value: string | undefined) {
-  return (value ?? 'file:./dev.db').trim();
+  const dbUrl = value?.trim();
+
+  if (dbUrl) return dbUrl;
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('DATABASE_URL is required in production');
+  }
+
+  return 'file:./dev.db';
 }
 
 function resolveWritableDatabaseUrl() {
