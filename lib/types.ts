@@ -60,6 +60,7 @@ export interface Resume {
   workExperiences: WorkExperience[];
   isFavorite: boolean;
   status: ResumeStatus;
+  rejectReason?: string;
 }
 
 export interface Employer {

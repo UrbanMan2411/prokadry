@@ -119,6 +119,7 @@ export async function GET(_req: NextRequest) {
       })),
       isFavorite: favoriteSet.has(r.id),
       status: r.status.toLowerCase() as Resume['status'],
+      rejectReason: session.role === 'SEEKER' ? (r.rejectReason ?? undefined) : undefined,
     }));
 
     return NextResponse.json(resumes);

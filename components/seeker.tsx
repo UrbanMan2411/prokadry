@@ -89,7 +89,7 @@ type SpecialStatusEntry = { value: string; docDate: string; docNumber: string; d
 type TestEntry = { value: string; passedAt: string };
 
 type ResumeFormFull = {
-  dbId: string; dbStatus: string;
+  dbId: string; dbStatus: string; rejectReason: string;
   firstName: string; lastName: string; patronymic: string; gender: string; birthDate: string;
   city: string; phone: string; email: string; photoUrl: string;
   position: string; positionValid: boolean; salary: string; workMode: string;
@@ -103,7 +103,7 @@ type ResumeFormFull = {
 };
 
 const emptyForm = (): ResumeFormFull => ({
-  dbId: '', dbStatus: 'draft',
+  dbId: '', dbStatus: 'draft', rejectReason: '',
   firstName: '', lastName: '', patronymic: '', gender: 'FEMALE', birthDate: '',
   city: '', region: '', phone: '', email: '', photoUrl: '',
   position: '', positionValid: true, salary: '', workMode: 'Офис',
@@ -451,7 +451,7 @@ function MatchedVacanciesModal({ vacancies, onClose }: { vacancies: MatchedVacan
 
 function resumeToForm(r: import('@/lib/types').Resume): ResumeFormFull {
   return {
-    dbId: r.id, dbStatus: r.status,
+    dbId: r.id, dbStatus: r.status, rejectReason: r.rejectReason ?? '',
     firstName: r.firstName, lastName: r.lastName, patronymic: r.patronymic ?? '', gender: r.gender,
     birthDate: r.birthDate ?? '',
     city: r.city, region: r.region ?? '', phone: '', email: '', photoUrl: r.photo ?? '',
@@ -956,9 +956,22 @@ export function MyResume() {
               </Btn>
             )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            {form.dbId && form.dbStatus === 'rejected' && form.rejectReason && (
+              <div className="w-full mb-1 flex items-start gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
+                <svg className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <p className="text-xs text-red-700"><span className="font-semibold">Причина отклонения:</span> {form.rejectReason}</p>
+              </div>
+            )}
+            {form.dbId && form.dbStatus === 'pending' && (
+              <div className="w-full mb-1 flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <p className="text-xs text-amber-700">Резюме отправлено на проверку — ожидайте одобрения администратора.</p>
+                <button onClick={() => saveToDb('DRAFT')} className="ml-auto text-xs text-amber-600 hover:text-amber-800 font-medium underline underline-offset-2">Отозвать</button>
+              </div>
+            )}
             {form.dbId && (form.dbStatus === 'draft' || form.dbStatus === 'rejected') && (
-              <Btn variant="secondary" onClick={() => saveToDb('ACTIVE')} disabled={saving}>Опубликовать</Btn>
+              <Btn variant="secondary" onClick={() => saveToDb('PENDING')} disabled={saving}>Отправить на проверку</Btn>
             )}
             {form.dbId && form.dbStatus === 'active' && (
               <Btn variant="ghost" onClick={() => saveToDb('DRAFT')} disabled={saving}>Снять с публикации</Btn>
@@ -979,6 +992,7 @@ type EmployerPublicInfo = { name: string; region: string; city: string; descript
 export function SeekerInvitations({ invitations, setInvitations }: { invitations: Invitation[]; setInvitations: React.Dispatch<React.SetStateAction<Invitation[]>> }) {
   const [empModal, setEmpModal] = useState<EmployerPublicInfo | null>(null);
   const [empLoading, setEmpLoading] = useState('');
+  const [replyMsgs, setReplyMsgs] = useState<Record<string, string>>({});
 
   const showEmployer = async (employerId: string) => {
     setEmpLoading(employerId);
@@ -1003,11 +1017,12 @@ export function SeekerInvitations({ invitations, setInvitations }: { invitations
   }, []);
 
   const respond = (id: string, status: 'accepted' | 'rejected') => {
+    const replyMessage = replyMsgs[id]?.trim() || undefined;
     setInvitations(prev => prev.map(i => i.id === id ? { ...i, status } : i));
     fetch(`/api/invitations/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, replyMessage }),
     }).catch(() => {});
   };
 
@@ -1047,9 +1062,18 @@ export function SeekerInvitations({ invitations, setInvitations }: { invitations
                         </div>
                       </div>
                       {inv.status === 'sent' && (
-                        <div className="flex gap-2 mt-3">
-                          <Btn size="sm" variant="primary" onClick={() => respond(inv.id, 'accepted')}>Принять</Btn>
-                          <Btn size="sm" variant="secondary" onClick={() => respond(inv.id, 'rejected')}>Отклонить</Btn>
+                        <div className="mt-3 space-y-2">
+                          <textarea
+                            value={replyMsgs[inv.id] ?? ''}
+                            onChange={e => setReplyMsgs(prev => ({ ...prev, [inv.id]: e.target.value }))}
+                            placeholder="Ответное сообщение (необязательно)..."
+                            rows={2}
+                            className="w-full rounded-lg border border-slate-200 text-xs px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                          />
+                          <div className="flex gap-2">
+                            <Btn size="sm" variant="primary" onClick={() => respond(inv.id, 'accepted')}>Принять</Btn>
+                            <Btn size="sm" variant="secondary" onClick={() => respond(inv.id, 'rejected')}>Отклонить</Btn>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1412,6 +1436,7 @@ export function SeekerVacancyRegistry({ vacancies, invitations = [] }: { vacanci
   const [search, setSearch] = useState('');
   const [sphere, setSphere] = useState('');
   const [activity, setActivity] = useState('');
+  const [skill, setSkill] = useState('');
   const [workMode, setWorkMode] = useState('');
   const [salaryMin, setSalaryMin] = useState('');
   const [salaryMax, setSalaryMax] = useState('');
@@ -1442,12 +1467,16 @@ export function SeekerVacancyRegistry({ vacancies, invitations = [] }: { vacanci
     }
   };
 
-  const active = vacancies.filter(v => v.status === 'active').filter(v => {
+  const allActive = vacancies.filter(v => v.status === 'active');
+  const allSkills = [...new Set(allActive.flatMap(v => v.skills ?? []))].sort((a, b) => a.localeCompare(b, 'ru'));
+
+  const active = allActive.filter(v => {
     if (search && !v.title.toLowerCase().includes(search.toLowerCase()) &&
         !v.employerName.toLowerCase().includes(search.toLowerCase()) &&
         !v.city.toLowerCase().includes(search.toLowerCase())) return false;
     if (sphere && !v.clientSpheres?.includes(sphere)) return false;
     if (activity && !v.specialistActivities?.includes(activity)) return false;
+    if (skill && !v.skills?.includes(skill)) return false;
     if (workMode && v.workMode !== workMode) return false;
     if (salaryMin && v.salaryFrom && v.salaryFrom < Number(salaryMin)) return false;
     if (salaryMax && v.salaryTo && v.salaryTo > Number(salaryMax)) return false;
@@ -1475,6 +1504,11 @@ export function SeekerVacancyRegistry({ vacancies, invitations = [] }: { vacanci
             className="rounded-lg border border-slate-200 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-600">
             <option value="">Вид деятельности</option>
             {DICTIONARIES.specialistActivities.map(a => <option key={a}>{a}</option>)}
+          </select>
+          <select value={skill} onChange={e => setSkill(e.target.value)}
+            className="rounded-lg border border-slate-200 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-600">
+            <option value="">Навык / специализация</option>
+            {allSkills.map(s => <option key={s}>{s}</option>)}
           </select>
           <select value={workMode} onChange={e => setWorkMode(e.target.value)}
             className="rounded-lg border border-slate-200 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-600">

@@ -53,7 +53,7 @@ export async function PATCH(
       if (educationYears !== undefined) data.educationYears = educationYears || null;
       if (workMode !== undefined) data.workMode = workMode;
       if (about !== undefined) data.about = about || null;
-      if (status === 'ACTIVE') { data.status = 'ACTIVE'; data.publishedAt = new Date(); }
+      if (status === 'PENDING') { data.status = 'PENDING'; }
       else if (status === 'DRAFT') data.status = 'DRAFT';
 
       const updatedResume = await db.resume.update({ where: { id }, data, select: { position: true, city: true, salary: true, workMode: true } });

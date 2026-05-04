@@ -13,7 +13,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { status } = await req.json();
+    const { status, replyMessage } = await req.json();
     const dbStatus = String(status).toUpperCase();
     const seekerAllowed = ['ACCEPTED', 'REJECTED', 'VIEWED'];
     const employerAllowed = ['ACCEPTED', 'REJECTED'];
@@ -39,6 +39,7 @@ export async function PATCH(
     const updateData: Record<string, unknown> = { status: dbStatus };
     if (dbStatus === 'VIEWED') updateData.viewedAt = new Date();
     else updateData.respondedAt = new Date();
+    if (replyMessage !== undefined) updateData.replyMessage = replyMessage || null;
     const updated = await db.invitation.update({
       where: { id },
       data: updateData as never,

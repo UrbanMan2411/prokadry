@@ -19,8 +19,12 @@ export function EmployerDashboard({
   const pendingInv = invitations.filter(i => i.status === 'sent').length;
   const unviewedInv = invitations.filter(i => i.status === 'viewed').length;
   const [empStatus, setEmpStatus] = useState('');
+  const [empName, setEmpName] = useState('');
   useEffect(() => {
-    fetch('/api/employers/me').then(r => r.json()).then(d => setEmpStatus(d.status ?? '')).catch(() => {});
+    fetch('/api/employers/me').then(r => r.json()).then((d: { status?: string; name?: string }) => {
+      setEmpStatus(d.status ?? '');
+      setEmpName(d.name ?? '');
+    }).catch(() => {});
   }, []);
   const attentionItems = [
     pendingInv > 0 && `${pendingInv} приглашений ждут ответа`,
@@ -59,7 +63,7 @@ export function EmployerDashboard({
 
       <div className="mb-6">
         <h1 className="text-xl font-bold text-slate-800">Добро пожаловать!</h1>
-        <p className="text-sm text-slate-500 mt-0.5">ООО «ТехноСервис» · Работодатель</p>
+        <p className="text-sm text-slate-500 mt-0.5">{empName || 'Работодатель'}</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -219,7 +223,11 @@ function VacancyModal({
     fetch('/api/dict?category=SKILL').then(r => r.ok ? r.json() : []).then(setDictSkills).catch(() => {});
     fetch('/api/dict?category=ACTIVITY_AREA').then(r => r.ok ? r.json() : []).then(setDictAreas).catch(() => {});
     fetch('/api/dict?category=PURCHASE_TYPE').then(r => r.ok ? r.json() : []).then(setDictPurchase).catch(() => {});
-    fetch('/api/employers/me').then(r => r.ok ? r.json() : {}).then((d: { status?: string }) => setEmpStatus(d.status ?? '')).catch(() => {});
+    fetch('/api/employers/me').then(r => r.ok ? r.json() : {}).then((d: { status?: string }) => {
+      const s = d.status ?? '';
+      setEmpStatus(s);
+      if (s === 'pending') setForm(f => ({ ...f, status: 'draft' }));
+    }).catch(() => {});
   }, [open]);
 
   return (
@@ -253,7 +261,11 @@ function VacancyModal({
           <label className="text-xs font-medium text-slate-600 mb-1 block">Статус</label>
           <Select
             value={form.status ?? 'active'} onChange={v => upd('status', v as Vacancy['status'])}
-            options={[{ value: 'active', label: 'Активна' }, { value: 'archived', label: 'В архиве' }, { value: 'draft', label: 'Черновик' }]}
+            options={[
+              ...(empStatus !== 'pending' ? [{ value: 'active', label: 'Активна' }] : []),
+              { value: 'draft', label: 'Черновик' },
+              { value: 'archived', label: 'В архиве' },
+            ]}
           />
         </div>
         <div>

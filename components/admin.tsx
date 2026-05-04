@@ -349,7 +349,7 @@ export function AdminVacancies({ vacancies, setVacancies }: {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
-              {['Вакансия', 'Работодатель', 'Город', 'Зарплата', 'Режим', 'Статус', 'Создана', 'Действия'].map(h => (
+              {['Вакансия', 'Работодатель', 'Город', 'Теги', 'Статус', 'Создана', 'Действия'].map(h => (
                 <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
               ))}
             </tr>
@@ -361,12 +361,17 @@ export function AdminVacancies({ vacancies, setVacancies }: {
                   <div className="font-semibold text-slate-800">{v.title}</div>
                   <div className="text-xs text-slate-400">{v.department}</div>
                 </td>
-                <td className="px-4 py-3 text-slate-500 text-xs max-w-[160px] truncate">{v.employerName}</td>
-                <td className="px-4 py-3 text-slate-600">{v.city}</td>
-                <td className="px-4 py-3 text-slate-700 whitespace-nowrap text-xs">
-                  {v.salaryFrom.toLocaleString('ru-RU')}–{v.salaryTo.toLocaleString('ru-RU')} ₽
+                <td className="px-4 py-3 text-slate-500 text-xs max-w-[140px] truncate">{v.employerName}</td>
+                <td className="px-4 py-3 text-slate-600 text-xs">{v.city}</td>
+                <td className="px-4 py-3 max-w-[180px]">
+                  <div className="flex flex-wrap gap-1">
+                    {v.skills.slice(0, 2).map(s => <span key={s} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 whitespace-nowrap">{s}</span>)}
+                    {v.clientSpheres.slice(0, 1).map(s => <span key={s} className="text-[10px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 whitespace-nowrap">{s}</span>)}
+                    {v.specialistActivities.slice(0, 1).map(s => <span key={s} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 whitespace-nowrap">{s}</span>)}
+                    {(() => { const extra = v.skills.length + v.clientSpheres.length + v.specialistActivities.length - 4; return extra > 0 ? <span className="text-[10px] text-slate-400">+{extra}</span> : null; })()}
+                    {v.skills.length + v.clientSpheres.length + v.specialistActivities.length === 0 && <span className="text-[10px] text-slate-300">—</span>}
+                  </div>
                 </td>
-                <td className="px-4 py-3"><Badge color="slate">{v.workMode}</Badge></td>
                 <td className="px-4 py-3"><StatusBadge status={v.status} /></td>
                 <td className="px-4 py-3 text-slate-400 text-xs">{fmtDate(v.createdAt)}</td>
                 <td className="px-4 py-3">

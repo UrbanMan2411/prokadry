@@ -26,17 +26,22 @@ const DEFAULT_PAGE: Record<Role, string> = {
   admin: 'admin-dashboard',
 };
 
-function on401() { window.location.href = '/auth'; }
-
-async function apiFetch(url: string): Promise<Response | null> {
-  const r = await fetch(url);
-  if (r.status === 401) { on401(); return null; }
-  return r;
-}
 
 export default function ClientApp({ initialRole, email }: { initialRole: Role; email: string }) {
   const [role, setRole] = useState<Role>(initialRole);
   const [page, setPage] = useState<string>(DEFAULT_PAGE[initialRole]);
+  const [loading, setLoading] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
+
+  const apiFetch = async (url: string): Promise<Response | null> => {
+    const r = await fetch(url);
+    if (r.status === 401) {
+      setSessionExpired(true);
+      setTimeout(() => { window.location.href = '/auth'; }, 2500);
+      return null;
+    }
+    return r;
+  };
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [vacancies, setVacancies] = useState<Vacancy[]>([]);
   const [employers, setEmployers] = useState<Employer[]>([]);
@@ -70,14 +75,21 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
   }, [role, messages, invitations, resumes]);
 
   useEffect(() => {
-    apiFetch('/api/resumes').then(r => r?.ok ? r.json() : null).then(d => { if (d) setResumes(d); }).catch(() => {});
-    apiFetch('/api/vacancies').then(r => r?.ok ? r.json() : null).then(d => { if (d) setVacancies(d); }).catch(() => {});
-    apiFetch('/api/messages').then(r => r?.ok ? r.json() : null).then(d => { if (d) setMessages(d); }).catch(() => {});
-    apiFetch('/api/invitations').then(r => r?.ok ? r.json() : null).then(d => { if (d) setInvitations(d); }).catch(() => {});
-    if (initialRole === 'admin') {
-      apiFetch('/api/employers').then(r => r?.ok ? r.json() : null).then(d => { if (d) setEmployers(d); }).catch(() => {});
-      apiFetch('/api/admin/logs').then(r => r?.ok ? r.json() : null).then(d => { if (d) setAuditLogs(d); }).catch(() => {});
-    }
+    const load = async () => {
+      await Promise.all([
+        apiFetch('/api/resumes').then(r => r?.ok ? r.json() : null).then(d => { if (d) setResumes(d); }).catch(() => {}),
+        apiFetch('/api/vacancies').then(r => r?.ok ? r.json() : null).then(d => { if (d) setVacancies(d); }).catch(() => {}),
+        apiFetch('/api/messages').then(r => r?.ok ? r.json() : null).then(d => { if (d) setMessages(d); }).catch(() => {}),
+        apiFetch('/api/invitations').then(r => r?.ok ? r.json() : null).then(d => { if (d) setInvitations(d); }).catch(() => {}),
+        ...(initialRole === 'admin' ? [
+          apiFetch('/api/employers').then(r => r?.ok ? r.json() : null).then(d => { if (d) setEmployers(d); }).catch(() => {}),
+          apiFetch('/api/admin/logs').then(r => r?.ok ? r.json() : null).then(d => { if (d) setAuditLogs(d); }).catch(() => {}),
+        ] : []),
+      ]);
+      setLoading(false);
+    };
+    load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialRole]);
 
   useEffect(() => {
@@ -272,8 +284,32 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
     );
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-3">
+          <svg className="w-8 h-8 text-blue-600 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <span className="text-sm text-slate-500">Загрузка...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <AppShell role={role} email={email} page={page} setPage={setPage} badges={badges}>
+      {sessionExpired && (
+        <div className="fixed inset-0 z-[9999] flex items-end justify-center pb-8 pointer-events-none">
+          <div className="bg-slate-900 text-white text-sm px-5 py-3 rounded-xl shadow-xl flex items-center gap-3">
+            <svg className="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Сессия истекла — перенаправление на страницу входа...
+          </div>
+        </div>
+      )}
       <InviteModal
         open={inviteOpen}
         onClose={() => setInviteOpen(false)}
