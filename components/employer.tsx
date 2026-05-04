@@ -614,7 +614,15 @@ function buildThreads(messages: Message[]): Thread[] {
       });
     }
     const t = map.get(cpId)!;
-    t.msgs.push({ id: m.id, fromMe: m.fromRole === 'employer', text: m.text, ts: m.createdAt });
+    if (m.text === '__contact_request__') {
+      if (t.contactState === 'hidden') t.contactState = 'requested';
+    } else if (m.text.startsWith('__contact_share__:')) {
+      const email = m.text.slice('__contact_share__:'.length);
+      t.contactInfo = { phone: '', email, telegram: '' };
+      t.contactState = 'opened';
+    } else {
+      t.msgs.push({ id: m.id, fromMe: m.fromRole === 'employer', text: m.text, ts: m.createdAt });
+    }
     if (!m.isRead && m.fromRole === 'candidate') t.unread = true;
   }
   return [AI_THREAD, ...Array.from(map.values())];
@@ -679,15 +687,15 @@ export function EmployerMessages({ messages, onMarkRead }: { messages: Message[]
   };
 
   const handleRequestContacts = () => {
-    if (!activeId) return;
-    const sysMsg: ChatMsg = { id: `sys-${Date.now()}`, fromMe: false, text: 'Работодатель запросил контактные данные.', ts: new Date().toISOString(), isSystem: true };
-    setThreads(prev => prev.map(t => t.id === activeId ? { ...t, contactState: 'requested', msgs: [...t.msgs, sysMsg] } : t));
-  };
-
-  const handleOpenContacts = () => {
-    if (!activeId) return;
-    const sysMsg: ChatMsg = { id: `sys-${Date.now()}`, fromMe: false, text: 'Кандидат поделился контактными данными.', ts: new Date().toISOString(), isSystem: true };
-    setThreads(prev => prev.map(t => t.id === activeId ? { ...t, contactState: 'opened', msgs: [...t.msgs, sysMsg] } : t));
+    if (!activeId || !active?.counterpartyUserId) return;
+    setThreads(prev => prev.map(t => t.id === activeId ? { ...t, contactState: 'requested' } : t));
+    fetch('/api/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipientUserId: active.counterpartyUserId, text: '__contact_request__' }),
+    }).catch(() => {
+      setThreads(prev => prev.map(t => t.id === activeId ? { ...t, contactState: 'hidden' } : t));
+    });
   };
 
   const lastMsg = (t: Thread) => t.msgs.filter(m => !m.isSystem).at(-1) ?? t.msgs.at(-1)!;
@@ -768,15 +776,10 @@ export function EmployerMessages({ messages, onMarkRead }: { messages: Message[]
                   </button>
                 )}
                 {active.contactState === 'requested' && (
-                  <div className="flex items-center justify-between w-full gap-2">
-                    <span className="text-xs text-slate-500 flex items-center gap-1.5">
-                      <svg className="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                      Запрос контактов отправлен — ожидаем ответа
-                    </span>
-                    <button onClick={handleOpenContacts} className="text-[11px] text-emerald-600 hover:text-emerald-800 font-medium underline">
-                      [Принять — симуляция]
-                    </button>
-                  </div>
+                  <span className="text-xs text-slate-500 flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    Запрос контактов отправлен — ожидаем ответа
+                  </span>
                 )}
                 {active.contactState === 'opened' && (
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-700">

@@ -182,7 +182,7 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
         case 'seeker-invitations':
           return <SeekerInvitations invitations={invitations} setInvitations={setInvitations} />;
         case 'seeker-messages':
-          return <SeekerMessages messages={messages} onMarkRead={id => {
+          return <SeekerMessages messages={messages} email={email} onMarkRead={id => {
             setMessages(prev => prev.map(m => m.id === id ? { ...m, isRead: true } : m));
             fetch(`/api/messages/${id}`, { method: 'PATCH' }).catch(() => {});
           }} />;

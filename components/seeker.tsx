@@ -958,7 +958,7 @@ export function SeekerInvitations({ invitations, setInvitations }: { invitations
 
 // ── Seeker Messages ────────────────────────────────────────────────────────
 type ChatMsg = { id: string; fromMe: boolean; text: string; ts: string };
-type Thread  = { id: string; name: string; msgs: ChatMsg[]; unread: boolean; counterpartyUserId: string };
+type Thread  = { id: string; name: string; msgs: ChatMsg[]; unread: boolean; counterpartyUserId: string; hasContactRequest?: boolean };
 
 function buildSeekerThreads(messages: Message[]): Thread[] {
   const map = new Map<string, Thread>();
@@ -966,22 +966,22 @@ function buildSeekerThreads(messages: Message[]): Thread[] {
     const cpId = m.counterpartyUserId;
     if (!cpId) continue;
     if (!map.has(cpId)) {
-      map.set(cpId, {
-        id: cpId,
-        name: m.fromRole === 'employer' ? m.fromName : m.toName,
-        msgs: [],
-        unread: false,
-        counterpartyUserId: cpId,
-      });
+      map.set(cpId, { id: cpId, name: m.fromRole === 'employer' ? m.fromName : m.toName, msgs: [], unread: false, counterpartyUserId: cpId });
     }
     const t = map.get(cpId)!;
-    t.msgs.push({ id: m.id, fromMe: m.fromRole === 'candidate', text: m.text, ts: m.createdAt });
+    if (m.text === '__contact_request__') {
+      t.hasContactRequest = true;
+    } else if (m.text.startsWith('__contact_share__:')) {
+      t.hasContactRequest = false;
+    } else {
+      t.msgs.push({ id: m.id, fromMe: m.fromRole === 'candidate', text: m.text, ts: m.createdAt });
+    }
     if (!m.isRead && m.fromRole === 'employer') t.unread = true;
   }
   return Array.from(map.values());
 }
 
-export function SeekerMessages({ messages, onMarkRead }: { messages: Message[]; onMarkRead?: (id: string) => void }) {
+export function SeekerMessages({ messages, onMarkRead, email }: { messages: Message[]; onMarkRead?: (id: string) => void; email?: string }) {
   const [threads, setThreads] = useState<Thread[]>(() => buildSeekerThreads(messages));
   const [activeId, setActiveId] = useState<string | null>(null);
   const [reply, setReply] = useState('');
@@ -992,6 +992,18 @@ export function SeekerMessages({ messages, onMarkRead }: { messages: Message[]; 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [active?.msgs.length]);
+
+  const shareContacts = () => {
+    if (!active?.counterpartyUserId || !email) return;
+    const shareText = `__contact_share__:${email}`;
+    fetch('/api/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipientUserId: active.counterpartyUserId, text: shareText }),
+    }).then(() => {
+      setThreads(prev => prev.map(t => t.id === activeId ? { ...t, hasContactRequest: false } : t));
+    }).catch(() => {});
+  };
 
   const send = () => {
     const text = reply.trim();
@@ -1033,8 +1045,8 @@ export function SeekerMessages({ messages, onMarkRead }: { messages: Message[]; 
                   <span className={`font-semibold text-sm truncate flex-1 ${t.unread ? 'text-slate-900' : 'text-slate-700'}`}>{t.name}</span>
                   {t.unread && <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" />}
                 </div>
-                <div className="text-xs text-slate-400 truncate">{lastMsg(t).text}</div>
-                <div className="text-[10px] text-slate-300 mt-1">{fmtDate(lastMsg(t).ts)}</div>
+                <div className="text-xs text-slate-400 truncate">{lastMsg(t)?.text ?? (t.hasContactRequest ? '📞 Запрос контактных данных' : '')}</div>
+                <div className="text-[10px] text-slate-300 mt-1">{lastMsg(t) ? fmtDate(lastMsg(t).ts) : ''}</div>
               </button>
             ))}
           </div>
@@ -1050,6 +1062,18 @@ export function SeekerMessages({ messages, onMarkRead }: { messages: Message[]; 
               <Avatar name={active.name} size="sm" />
               <div className="font-semibold text-slate-800 text-sm">{active.name}</div>
             </div>
+            {active.hasContactRequest && (
+              <div className="px-4 py-2.5 border-b border-amber-100 bg-amber-50 flex items-center justify-between gap-3">
+                <span className="text-xs text-amber-800 flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                  Работодатель запрашивает ваши контактные данные
+                </span>
+                <button onClick={shareContacts}
+                  className="text-xs px-3 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition whitespace-nowrap cursor-pointer">
+                  Поделиться email
+                </button>
+              </div>
+            )}
             <div className="flex-1 p-4 md:p-5 space-y-3 overflow-y-auto">
               {active.msgs.map(msg => (
                 <div key={msg.id} className={`flex gap-3 ${msg.fromMe ? 'flex-row-reverse' : ''}`}>
