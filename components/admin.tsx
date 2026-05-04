@@ -10,7 +10,10 @@ import { Badge, Btn, Input, StatCard, StatusBadge, Avatar } from './ui';
 export function AdminDashboard({ logs }: { logs: AuditLog[] }) {
   const [s, setS] = useState<AdminStats>({ totalResumes: 0, activeResumes: 0, pendingResumes: 0, totalEmployers: 0, approvedEmployers: 0, totalVacancies: 0, activeVacancies: 0, totalInvitations: 0 });
   useEffect(() => {
-    fetch('/api/admin/stats').then(r => r.json()).then(setS).catch(() => {});
+    fetch('/api/admin/stats')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data && typeof data.totalResumes === 'number') setS(data); })
+      .catch(() => {});
   }, []);
   return (
     <div className="p-6 max-w-6xl mx-auto">
