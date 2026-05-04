@@ -3,6 +3,35 @@ import { db } from '@/lib/db';
 import { getSession } from '@/lib/session';
 import type { Vacancy } from '@/lib/types';
 
+async function saveVacancyTags(
+  vacancyId: string,
+  skills?: string[],
+  activityAreas?: string[],
+  purchaseTypes?: string[],
+) {
+  if (Array.isArray(skills)) {
+    await db.vacancySkill.deleteMany({ where: { vacancyId } });
+    for (const v of skills) {
+      const item = await db.dictItem.findFirst({ where: { category: 'SKILL', value: v }, select: { id: true } });
+      if (item) await db.vacancySkill.create({ data: { vacancyId, dictItemId: item.id } }).catch(() => {});
+    }
+  }
+  const areaValues: { cat: 'ACTIVITY_AREA' | 'PURCHASE_TYPE'; arr: string[] }[] = [];
+  if (Array.isArray(activityAreas)) areaValues.push({ cat: 'ACTIVITY_AREA', arr: activityAreas });
+  if (Array.isArray(purchaseTypes)) areaValues.push({ cat: 'PURCHASE_TYPE', arr: purchaseTypes });
+  for (const { cat, arr } of areaValues) {
+    const existing = await db.vacancyActivityArea.findMany({
+      where: { vacancyId, dictItem: { category: cat as never } },
+      select: { dictItemId: true },
+    });
+    await db.vacancyActivityArea.deleteMany({ where: { vacancyId, dictItemId: { in: existing.map(e => e.dictItemId) } } });
+    for (const v of arr) {
+      const item = await db.dictItem.findFirst({ where: { category: cat as never, value: v }, select: { id: true } });
+      if (item) await db.vacancyActivityArea.create({ data: { vacancyId, dictItemId: item.id } }).catch(() => {});
+    }
+  }
+}
+
 export async function GET(_req: NextRequest) {
   try {
     const session = await getSession();
@@ -30,6 +59,7 @@ export async function GET(_req: NextRequest) {
       include: {
         employer: { select: { id: true, name: true } },
         skills: { include: { dictItem: true } },
+        activityAreas: { include: { dictItem: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -47,8 +77,8 @@ export async function GET(_req: NextRequest) {
       salaryTo: v.salaryTo ?? 0,
       description: v.description ?? '',
       skills: v.skills.map(s => s.dictItem.label),
-      clientSpheres: [],
-      specialistActivities: [],
+      clientSpheres: v.activityAreas.filter(a => a.dictItem.category === 'ACTIVITY_AREA').map(a => a.dictItem.label),
+      specialistActivities: v.activityAreas.filter(a => a.dictItem.category === 'PURCHASE_TYPE').map(a => a.dictItem.label),
       status: v.status.toLowerCase() as Vacancy['status'],
       createdAt: v.createdAt.toISOString(),
     }));
@@ -74,7 +104,7 @@ export async function POST(req: NextRequest) {
     if (!emp) return NextResponse.json({ error: 'Employer not found' }, { status: 404 });
 
     const body = await req.json();
-    const { title, department, city, workMode, salaryFrom, salaryTo, description, status } = body;
+    const { title, department, city, workMode, salaryFrom, salaryTo, description, status, skills, activityAreas, purchaseTypes } = body;
 
     const requestedStatus = (['DRAFT', 'ACTIVE', 'ARCHIVED'].includes((status ?? '').toUpperCase())
       ? status.toUpperCase()
@@ -99,26 +129,46 @@ export async function POST(req: NextRequest) {
       include: {
         employer: { select: { id: true, name: true } },
         skills: { include: { dictItem: true } },
+        activityAreas: { include: { dictItem: true } },
       },
     });
 
+    await saveVacancyTags(row.id, skills, activityAreas, purchaseTypes);
+
+    const savedRow = await db.vacancy.findUnique({
+      where: { id: row.id },
+      include: {
+        employer: { select: { id: true, name: true } },
+        skills: { include: { dictItem: true } },
+        activityAreas: { include: { dictItem: true } },
+      },
+    });
+
+    if (!savedRow) {
+      return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+    }
+
     const vacancy: Vacancy = {
-      id: row.id,
-      employerId: row.employerId,
-      employerName: row.employer.name,
-      title: row.title,
-      department: row.department ?? '',
-      city: row.city,
-      region: row.region,
-      workMode: row.workMode,
-      salaryFrom: row.salaryFrom ?? 0,
-      salaryTo: row.salaryTo ?? 0,
-      description: row.description ?? '',
-      skills: row.skills.map(s => s.dictItem.label),
-      clientSpheres: [],
-      specialistActivities: [],
-      status: row.status.toLowerCase() as Vacancy['status'],
-      createdAt: row.createdAt.toISOString(),
+      id: savedRow.id,
+      employerId: savedRow.employerId,
+      employerName: savedRow.employer.name,
+      title: savedRow.title,
+      department: savedRow.department ?? '',
+      city: savedRow.city,
+      region: savedRow.region,
+      workMode: savedRow.workMode,
+      salaryFrom: savedRow.salaryFrom ?? 0,
+      salaryTo: savedRow.salaryTo ?? 0,
+      description: savedRow.description ?? '',
+      skills: savedRow.skills.map(s => s.dictItem.label),
+      clientSpheres: savedRow.activityAreas
+        .filter(a => a.dictItem.category === 'ACTIVITY_AREA')
+        .map(a => a.dictItem.label),
+      specialistActivities: savedRow.activityAreas
+        .filter(a => a.dictItem.category === 'PURCHASE_TYPE')
+        .map(a => a.dictItem.label),
+      status: savedRow.status.toLowerCase() as Vacancy['status'],
+      createdAt: savedRow.createdAt.toISOString(),
     };
 
     return NextResponse.json(vacancy, { status: 201 });

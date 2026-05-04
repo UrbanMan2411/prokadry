@@ -278,6 +278,7 @@ model DictItem {
   resumeTests           ResumeTest[]
   resumeSpecialStatuses ResumeSpecialStatus[]
   vacancySkills         VacancySkill[]
+  vacancyActivityAreas  VacancyActivityArea[]
 
   @@unique([category, value])
   @@index([category, isActive, sortOrder])
@@ -306,14 +307,24 @@ model Vacancy {
   updatedAt   DateTime      @updatedAt
   archivedAt  DateTime?
 
-  skills      VacancySkill[]
-  invitations Invitation[]
+  skills         VacancySkill[]
+  activityAreas  VacancyActivityArea[]
+  invitations    Invitation[]
 
   @@index([employerId, status])
   @@index([status, region])
 }
 
 model VacancySkill {
+  vacancyId  String
+  vacancy    Vacancy  @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
+  dictItemId String
+  dictItem   DictItem @relation(fields: [dictItemId], references: [id])
+
+  @@id([vacancyId, dictItemId])
+}
+
+model VacancyActivityArea {
   vacancyId  String
   vacancy    Vacancy  @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
   dictItemId String
