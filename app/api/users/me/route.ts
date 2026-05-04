@@ -13,14 +13,14 @@ export async function GET() {
         id: true,
         email: true,
         role: true,
-        resume: { select: { firstName: true, lastName: true, patronymic: true } },
+        resumes: { select: { firstName: true, lastName: true, patronymic: true }, take: 1 },
         employer: { select: { contactName: true, phone: true } },
       },
     });
     if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const firstName = user.resume?.firstName ?? user.employer?.contactName?.split(' ')[1] ?? '';
-    const lastName = user.resume?.lastName ?? user.employer?.contactName?.split(' ')[0] ?? '';
+    const firstName = user.resumes[0]?.firstName ?? user.employer?.contactName?.split(' ')[1] ?? '';
+    const lastName = user.resumes[0]?.lastName ?? user.employer?.contactName?.split(' ')[0] ?? '';
     const phone = user.employer?.phone ?? '';
 
     return NextResponse.json({ email: user.email, firstName, lastName, phone });

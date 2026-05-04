@@ -5,7 +5,7 @@ import type { Role } from '@/lib/types';
 import type { Resume, Vacancy, Employer, Message, Invitation, AuditLog } from '@/lib/types';
 import { AppShell } from '@/components/layout';
 import { ResumeRegistry } from '@/components/registry';
-import { ResumeDetail, InviteModal } from '@/components/resume';
+import { ResumeDetail, InviteModal, MessageModal } from '@/components/resume';
 import {
   EmployerDashboard, EmployerVacancies, EmployerFavorites,
   EmployerMessages, EmployerInvitations, CompanyProfile,
@@ -49,6 +49,8 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
   const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
   const [inviteTarget, setInviteTarget] = useState<Resume | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [msgTarget, setMsgTarget] = useState<Resume | null>(null);
+  const [msgOpen, setMsgOpen] = useState(false);
   const [registryPreset, setRegistryPreset] = useState<string>('');
   const [selectedRegion, setSelectedRegion] = useState<string>('');
 
@@ -139,6 +141,7 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
               vacancies={vacancies}
               onOpenResume={handleOpenResume}
               onInvite={handleInvite}
+              onMessage={r => { setMsgTarget(r); setMsgOpen(true); }}
               presetQuery={registryPreset}
             />
           );
@@ -235,6 +238,11 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
         onSent={() => {
           fetch('/api/messages').then(r => r.ok ? r.json() : []).then(setMessages).catch(() => {});
         }}
+      />
+      <MessageModal
+        open={msgOpen}
+        onClose={() => setMsgOpen(false)}
+        resume={msgTarget}
       />
       {renderPage()}
     </AppShell>

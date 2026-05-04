@@ -108,7 +108,7 @@ model User {
   lastLoginAt  DateTime?
 
   employer     Employer?
-  resume       Resume?
+  resumes      Resume[]
 
   sentMessages     Message[] @relation("SentMessages")
   receivedMessages Message[] @relation("ReceivedMessages")
@@ -159,7 +159,7 @@ model Employer {
 
 model Resume {
   id          String       @id @default(cuid())
-  userId      String       @unique
+  userId      String
   user        User         @relation(fields: [userId], references: [id])
 
   firstName   String

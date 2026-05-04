@@ -306,9 +306,9 @@ function SortTh({ label, sortKey, currentKey, dir, onSort }: {
 }
 
 // ── Expandable table row ────────────────────────────────────────────────────
-function ResumeRow({ resume, expanded, onExpand, onOpen, onInvite, onToggleFav, selected, onSelect }: {
+function ResumeRow({ resume, expanded, onExpand, onOpen, onInvite, onMessage, onToggleFav, selected, onSelect }: {
   resume: Resume; expanded: boolean; onExpand: () => void;
-  onOpen: (r: Resume) => void; onInvite: (r: Resume) => void;
+  onOpen: (r: Resume) => void; onInvite: (r: Resume) => void; onMessage?: (r: Resume) => void;
   onToggleFav: (id: string) => void; selected: boolean; onSelect: () => void;
 }) {
   const hasSVO = resume.specialStatuses.length > 0;
@@ -380,6 +380,17 @@ function ResumeRow({ resume, expanded, onExpand, onOpen, onInvite, onToggleFav, 
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
             </button>
+            {onMessage && (
+              <button
+                onClick={() => onMessage(resume)}
+                className="p-1.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition"
+                title="Написать"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+              </button>
+            )}
           </div>
         </td>
       </tr>
@@ -423,6 +434,14 @@ function ResumeRow({ resume, expanded, onExpand, onOpen, onInvite, onToggleFav, 
                   >
                     Пригласить
                   </button>
+                  {onMessage && (
+                    <button
+                      onClick={() => onMessage(resume)}
+                      className="text-xs font-medium px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition"
+                    >
+                      Написать
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -451,8 +470,9 @@ function SkeletonRows() {
 }
 
 // ── Resume Cards view ───────────────────────────────────────────────────────
-function ResumeCards({ resumes, onOpen, onInvite, onToggleFav }: {
-  resumes: Resume[]; onOpen: (r: Resume) => void; onInvite: (r: Resume) => void; onToggleFav: (id: string) => void;
+function ResumeCards({ resumes, onOpen, onInvite, onMessage, onToggleFav }: {
+  resumes: Resume[]; onOpen: (r: Resume) => void; onInvite: (r: Resume) => void;
+  onMessage?: (r: Resume) => void; onToggleFav: (id: string) => void;
 }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -505,6 +525,14 @@ function ResumeCards({ resumes, onOpen, onInvite, onToggleFav }: {
             >
               Пригласить
             </button>
+            {onMessage && (
+              <button
+                onClick={() => onMessage(r)}
+                className="flex-1 text-xs font-medium py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition"
+              >
+                Написать
+              </button>
+            )}
           </div>
         </div>
       ))}
@@ -652,11 +680,11 @@ function BulkInviteModal({ open, onClose, resumes, vacancies }: {
 
 // ── Main Registry ───────────────────────────────────────────────────────────
 export function ResumeRegistry({
-  resumes, setResumes, vacancies, onOpenResume, onInvite, presetQuery,
+  resumes, setResumes, vacancies, onOpenResume, onInvite, onMessage, presetQuery,
 }: {
   resumes: Resume[]; setResumes: (fn: (prev: Resume[]) => Resume[]) => void;
   vacancies: Vacancy[]; onOpenResume: (r: Resume) => void; onInvite: (r: Resume) => void;
-  presetQuery?: string;
+  onMessage?: (r: Resume) => void; presetQuery?: string;
 }) {
   const [query, setQuery] = useState(presetQuery ?? '');
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
@@ -858,6 +886,7 @@ export function ResumeRegistry({
                       onExpand={() => setExpandedId(expandedId === r.id ? null : r.id)}
                       onOpen={onOpenResume}
                       onInvite={onInvite}
+                      onMessage={onMessage}
                       onToggleFav={toggleFav}
                       selected={selected.has(r.id)}
                       onSelect={() => toggleSelect(r.id)}
@@ -868,7 +897,7 @@ export function ResumeRegistry({
             </div>
           ) : (
             <div className="p-5">
-              <ResumeCards resumes={sorted} onOpen={onOpenResume} onInvite={onInvite} onToggleFav={toggleFav} />
+              <ResumeCards resumes={sorted} onOpen={onOpenResume} onInvite={onInvite} onMessage={onMessage} onToggleFav={toggleFav} />
             </div>
           )}
         </div>

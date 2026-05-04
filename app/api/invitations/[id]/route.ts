@@ -20,7 +20,7 @@ export async function PATCH(
     }
 
     if (session.role === 'SEEKER') {
-      const resume = await db.resume.findUnique({ where: { userId: session.userId }, select: { id: true } });
+      const resume = await db.resume.findFirst({ where: { userId: session.userId }, select: { id: true } });
       if (!resume) return NextResponse.json({ error: 'Resume not found' }, { status: 404 });
       const existing = await db.invitation.findFirst({ where: { id, resumeId: resume.id } });
       if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });

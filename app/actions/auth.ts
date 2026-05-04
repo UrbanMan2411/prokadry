@@ -140,7 +140,7 @@ export async function signUpSeeker(
       email,
       passwordHash,
       role: 'SEEKER',
-      resume: {
+      resumes: {
         create: {
           firstName,
           lastName,

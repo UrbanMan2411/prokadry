@@ -142,7 +142,7 @@ async function main() {
       passwordHash: await hash('demo123'),
       role: 'SEEKER',
       isActive: true,
-      resume: {
+      resumes: {
         create: {
           firstName: 'Демо',
           lastName: 'Соискатель',

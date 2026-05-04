@@ -16,13 +16,13 @@ export async function GET(_req: NextRequest) {
         sender: {
           include: {
             employer: { select: { name: true } },
-            resume: { select: { firstName: true, lastName: true } },
+            resumes: { select: { firstName: true, lastName: true }, take: 1 },
           },
         },
         recipient: {
           include: {
             employer: { select: { name: true } },
-            resume: { select: { firstName: true, lastName: true } },
+            resumes: { select: { firstName: true, lastName: true }, take: 1 },
           },
         },
       },
@@ -34,10 +34,10 @@ export async function GET(_req: NextRequest) {
       role: string;
       email: string;
       employer: { name: string } | null;
-      resume: { firstName: string; lastName: string } | null;
+      resumes: { firstName: string; lastName: string }[];
     }) {
       if (u.role === 'EMPLOYER' && u.employer) return u.employer.name;
-      if (u.resume) return `${u.resume.firstName} ${u.resume.lastName}`.trim();
+      if (u.resumes[0]) return `${u.resumes[0].firstName} ${u.resumes[0].lastName}`.trim();
       return u.email;
     }
 

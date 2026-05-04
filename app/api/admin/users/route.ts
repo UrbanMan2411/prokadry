@@ -12,7 +12,7 @@ export async function GET() {
     const rows = await db.user.findMany({
       include: {
         employer: { select: { id: true, name: true, inn: true } },
-        resume: { select: { firstName: true, lastName: true } },
+        resumes: { select: { firstName: true, lastName: true }, take: 1 },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -23,7 +23,7 @@ export async function GET() {
       email: u.email,
       role: u.role.toLowerCase(),
       name: u.employer?.name
-        ?? (u.resume ? `${u.resume.firstName} ${u.resume.lastName}`.trim() : u.email),
+        ?? (u.resumes[0] ? `${u.resumes[0].firstName} ${u.resumes[0].lastName}`.trim() : u.email),
       org: u.employer?.name ?? '',
       inn: u.employer?.inn ?? '',
       isActive: u.isActive,

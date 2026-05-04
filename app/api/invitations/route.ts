@@ -19,12 +19,12 @@ export async function GET(_req: NextRequest) {
         where = { vacancy: { employerId: emp.id } };
       }
     } else if (session.role === 'SEEKER') {
-      const resume = await db.resume.findUnique({
+      const resumes = await db.resume.findMany({
         where: { userId: session.userId },
         select: { id: true },
       });
-      if (resume) {
-        where = { resumeId: resume.id };
+      if (resumes.length > 0) {
+        where = { resumeId: { in: resumes.map(r => r.id) } };
       }
     }
 
@@ -70,13 +70,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (session.role === 'SEEKER') {
-      const resume = await db.resume.findUnique({
-        where: { userId: session.userId },
-        select: { id: true },
-      });
+      const { vacancyId, resumeId: reqResumeId } = await req.json();
+      const resume = reqResumeId
+        ? await db.resume.findFirst({ where: { id: reqResumeId, userId: session.userId }, select: { id: true } })
+        : await db.resume.findFirst({ where: { userId: session.userId, status: 'ACTIVE' }, select: { id: true } })
+          ?? await db.resume.findFirst({ where: { userId: session.userId }, select: { id: true } });
       if (!resume) return NextResponse.json({ error: 'Resume not found' }, { status: 404 });
-
-      const { vacancyId } = await req.json();
       if (!vacancyId) return NextResponse.json({ error: 'Missing vacancyId' }, { status: 400 });
 
       const vacancy = await db.vacancy.findUnique({

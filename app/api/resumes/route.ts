@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSession } from '@/lib/session';
 import type { Resume, WorkExperience, SpecialStatus, ResumeTest } from '@/lib/types';
+import { logAction } from '@/lib/audit';
 
 function calcAge(birthDate: Date): number {
   const now = new Date();
@@ -123,5 +124,37 @@ export async function GET(_req: NextRequest) {
   } catch (err) {
     console.error('[api/resumes]', err);
     return NextResponse.json([], { status: 200 });
+  }
+}
+
+export async function POST(_req: NextRequest) {
+  try {
+    const session = await getSession();
+    if (!session || session.role !== 'SEEKER') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const row = await db.resume.create({
+      data: {
+        userId: session.userId,
+        firstName: '',
+        lastName: '',
+        gender: 'FEMALE',
+        birthDate: new Date('2000-01-01'),
+        city: '',
+        region: '',
+        position: '',
+        experience: 0,
+        education: 'Высшее',
+        workMode: 'Офис',
+        status: 'DRAFT',
+      },
+    });
+
+    logAction(session.userId, 'RESUME_CREATED', 'Resume', row.id);
+    return NextResponse.json({ id: row.id, status: 'draft' }, { status: 201 });
+  } catch (err) {
+    console.error('[api/resumes POST]', err);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

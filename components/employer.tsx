@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { Resume, Vacancy, Invitation, Message } from '@/lib/types';
 import { fmtSalary, fmtDate, fmtExp } from '@/lib/utils';
 import { Badge, Btn, Input, Select, Modal, Avatar, StarBtn, StatusBadge, StatCard, EmptyState } from './ui';
-import { InviteModal } from './resume';
+import { InviteModal, MessageModal } from './resume';
 import { DICTIONARIES } from '@/lib/mock-data';
 
 // ── Employer Dashboard ─────────────────────────────────────────────────────
@@ -416,6 +416,7 @@ export function EmployerFavorites({
   onOpenResume: (r: Resume) => void; vacancies: Vacancy[];
 }) {
   const [invOpen, setInvOpen] = useState(false);
+  const [msgOpen, setMsgOpen] = useState(false);
   const [selected, setSelected] = useState<Resume | null>(null);
   const [position, setPosition] = useState('');
   const [region, setRegion] = useState('');
@@ -452,6 +453,7 @@ export function EmployerFavorites({
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
       <InviteModal open={invOpen} onClose={() => setInvOpen(false)} resume={selected} vacancies={vacancies} />
+      <MessageModal open={msgOpen} onClose={() => setMsgOpen(false)} resume={selected} />
 
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
@@ -549,12 +551,20 @@ export function EmployerFavorites({
 
               <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
                 <span className={`text-sm font-semibold ${r.salary ? 'text-slate-800' : 'text-slate-300'}`}>{fmtSalary(r.salary)}</span>
-                <button
-                  onClick={e => { e.stopPropagation(); setSelected(r); setInvOpen(true); }}
-                  className="text-xs font-medium px-2.5 py-1 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition"
-                >
-                  Пригласить
-                </button>
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={e => { e.stopPropagation(); setSelected(r); setMsgOpen(true); }}
+                    className="text-xs font-medium px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition"
+                  >
+                    Написать
+                  </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); setSelected(r); setInvOpen(true); }}
+                    className="text-xs font-medium px-2.5 py-1 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition"
+                  >
+                    Пригласить
+                  </button>
+                </div>
               </div>
             </div>
           ))}

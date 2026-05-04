@@ -447,48 +447,71 @@ function MatchedVacanciesModal({ vacancies, onClose }: { vacancies: MatchedVacan
   );
 }
 
+function resumeToForm(r: import('@/lib/types').Resume): ResumeFormFull {
+  return {
+    dbId: r.id, dbStatus: r.status,
+    firstName: r.firstName, lastName: r.lastName, patronymic: r.patronymic ?? '', gender: r.gender,
+    city: r.city, phone: '', email: '', photoUrl: r.photo ?? '',
+    position: r.position, positionValid: true, salary: r.salary ? String(r.salary) : '', workMode: r.workMode,
+    experience: String(r.experience), education: r.education,
+    educationInstitution: r.educationInstitution ?? '', educationYears: r.educationYears ?? '',
+    workExperiences: r.workExperiences.map(w => ({
+      _id: String(w.id), company: w.company, role: w.role,
+      fromMonth: w.from, toMonth: w.to === 'по настоящее время' ? '' : w.to,
+      isCurrent: w.to === 'по настоящее время', description: w.description,
+    })),
+    activityAreas: r.activityAreas,
+    skills: r.skills,
+    purchaseTypes: r.purchaseTypes,
+    specialStatuses: r.specialStatuses.map(s => ({
+      value: s.value, docDate: s.docDate, docNumber: s.docNumber,
+      documentRef: s.documentRef, disabilityGroup: s.disabilityGroup,
+    })),
+    tests: r.tests.map(t => ({ value: t.value, passedAt: t.passedAt ?? '' })),
+    about: r.about,
+  };
+}
+
 export function MyResume() {
+  const [resumeList, setResumeList] = useState<import('@/lib/types').Resume[]>([]);
   const [form, setForm] = useState<ResumeFormFull>(emptyForm());
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [matchedVacancies, setMatchedVacancies] = useState<MatchedVacancy[] | null>(null);
 
-  useEffect(() => {
+  const loadResumes = (selectId?: string) => {
     fetch('/api/resumes').then(r => r.json())
       .then((data: import('@/lib/types').Resume[]) => {
+        setResumeList(data);
         if (data.length > 0) {
-          const r = data[0];
-          setForm({
-            dbId: r.id, dbStatus: r.status,
-            firstName: r.firstName, lastName: r.lastName, patronymic: r.patronymic ?? '', gender: r.gender,
-            city: r.city, phone: '', email: '', photoUrl: r.photo ?? '',
-            position: r.position, positionValid: true, salary: r.salary ? String(r.salary) : '', workMode: r.workMode,
-            experience: String(r.experience), education: r.education,
-            educationInstitution: r.educationInstitution ?? '', educationYears: r.educationYears ?? '',
-            workExperiences: r.workExperiences.map(w => ({
-              _id: String(w.id), company: w.company, role: w.role,
-              fromMonth: w.from, toMonth: w.to === 'по настоящее время' ? '' : w.to,
-              isCurrent: w.to === 'по настоящее время', description: w.description,
-            })),
-            activityAreas: r.activityAreas,
-            skills: r.skills,
-            purchaseTypes: r.purchaseTypes,
-            specialStatuses: r.specialStatuses.map(s => ({
-              value: s.value, docDate: s.docDate, docNumber: s.docNumber,
-              documentRef: s.documentRef, disabilityGroup: s.disabilityGroup,
-            })),
-            tests: r.tests.map(t => ({ value: t.value, passedAt: t.passedAt ?? '' })),
-            about: r.about,
-          });
+          const target = selectId ? data.find(r => r.id === selectId) ?? data[0] : data[0];
+          setForm(resumeToForm(target));
         }
       })
       .catch(() => {});
+  };
+
+  useEffect(() => {
+    loadResumes();
     fetch('/api/users/me').then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setForm(f => ({ ...f, phone: d.phone ?? '', email: d.email ?? '' })); })
       .catch(() => {});
   }, []);
 
   const upd = (k: keyof ResumeFormFull, v: unknown) => { setForm(f => ({ ...f, [k]: v })); setSaved(false); };
+
+  const createNewResume = async () => {
+    setCreating(true);
+    try {
+      const res = await fetch('/api/resumes', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        loadResumes(data.id);
+        setSaved(false);
+      }
+    } finally { setCreating(false); }
+  };
 
   const saveToDb = async (newStatus?: string) => {
     if (!form.dbId) return;
@@ -575,11 +598,36 @@ export function MyResume() {
           <h1 className="text-xl font-bold text-slate-800">Моё резюме</h1>
           <p className="text-sm text-slate-500 mt-0.5">Ваш профиль для работодателей</p>
         </div>
-        {form.dbStatus && (
-          <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_COLORS[form.dbStatus] ?? 'text-slate-500 bg-slate-100'}`}>
-            {STATUS_LABELS[form.dbStatus] ?? form.dbStatus}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {resumeList.length > 1 && (
+            <select
+              value={form.dbId}
+              onChange={e => {
+                const r = resumeList.find(x => x.id === e.target.value);
+                if (r) { setForm(resumeToForm(r)); setSaved(false); }
+              }}
+              className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {resumeList.map(r => (
+                <option key={r.id} value={r.id}>
+                  {r.position || 'Без названия'} ({STATUS_LABELS[r.status] ?? r.status})
+                </option>
+              ))}
+            </select>
+          )}
+          <button
+            onClick={createNewResume}
+            disabled={creating}
+            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition disabled:opacity-50"
+          >
+            {creating ? '...' : '+ Новое резюме'}
+          </button>
+          {form.dbStatus && (
+            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_COLORS[form.dbStatus] ?? 'text-slate-500 bg-slate-100'}`}>
+              {STATUS_LABELS[form.dbStatus] ?? form.dbStatus}
+            </span>
+          )}
+        </div>
       </div>
 
       <ResumeImportPanel onImport={r => {

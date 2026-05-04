@@ -315,7 +315,7 @@ async function main() {
           update: {},
         });
 
-        const existing = await tx.resume.findUnique({ where: { userId: user.id } });
+        const existing = await tx.resume.findFirst({ where: { userId: user.id } });
         if (existing) { skipped++; return; }
 
         const resume = await tx.resume.create({

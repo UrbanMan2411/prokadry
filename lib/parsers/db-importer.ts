@@ -20,9 +20,9 @@ export async function importResumeToDb(r: ParsedResumeForDB): Promise<ImportResu
 
   try {
     // Dedup by import email
-    const existing = await db.user.findUnique({ where: { email }, select: { resume: { select: { id: true } } } });
-    if (existing?.resume) {
-      return { sourceId: r.sourceId, status: 'skipped', resumeId: existing.resume.id };
+    const existing = await db.user.findUnique({ where: { email }, select: { resumes: { select: { id: true }, take: 1 } } });
+    if (existing?.resumes[0]) {
+      return { sourceId: r.sourceId, status: 'skipped', resumeId: existing.resumes[0].id };
     }
 
     const hash = await ghostHash();
@@ -33,9 +33,8 @@ export async function importResumeToDb(r: ParsedResumeForDB): Promise<ImportResu
       update: {},
     });
 
-    const resume = await db.resume.upsert({
-      where: { userId: user.id },
-      create: {
+    const resume = await db.resume.create({
+      data: {
         userId: user.id,
         firstName: r.firstName.slice(0, 100),
         lastName: r.lastName.slice(0, 100),
@@ -66,7 +65,6 @@ export async function importResumeToDb(r: ParsedResumeForDB): Promise<ImportResu
             }
           : undefined,
       },
-      update: {},
     });
 
     return { sourceId: r.sourceId, status: 'created', resumeId: resume.id };
