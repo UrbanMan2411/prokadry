@@ -4,12 +4,24 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
-function normalizeDatabaseUrl(value: string | undefined) {
-  return (value ?? 'file:./dev.db').trim();
+function shouldRequireProductionDatabaseUrl() {
+  return process.env.VERCEL_ENV === 'production';
+}
+
+function getDatabaseUrl() {
+  const dbUrl = process.env.DATABASE_URL?.trim() || process.env.TURSO_DATABASE_URL?.trim();
+
+  if (dbUrl) return dbUrl;
+
+  if (shouldRequireProductionDatabaseUrl()) {
+    throw new Error('DATABASE_URL or TURSO_DATABASE_URL is required in production');
+  }
+
+  return 'file:./dev.db';
 }
 
 function resolveWritableDatabaseUrl() {
-  const dbUrl = normalizeDatabaseUrl(process.env.DATABASE_URL);
+  const dbUrl = getDatabaseUrl();
 
   if (!dbUrl.startsWith('file:')) return dbUrl;
 
@@ -42,7 +54,11 @@ function resolveWritableDatabaseUrl() {
 }
 
 function createPrisma() {
-  const adapter = new PrismaLibSql({ url: resolveWritableDatabaseUrl() });
+  const authToken = process.env.TURSO_AUTH_TOKEN?.trim();
+  const adapter = new PrismaLibSql({
+    url: resolveWritableDatabaseUrl(),
+    ...(authToken ? { authToken } : {}),
+  });
   return new PrismaClient({ adapter });
 }
 

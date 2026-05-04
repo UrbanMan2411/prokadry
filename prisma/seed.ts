@@ -2,7 +2,12 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaLibSql } from '@prisma/adapter-libsql';
 import bcrypt from 'bcryptjs';
 
-const adapter = new PrismaLibSql({ url: 'file:./dev.db' });
+const databaseUrl = process.env.DATABASE_URL?.trim() || process.env.TURSO_DATABASE_URL?.trim() || 'file:./dev.db';
+const authToken = process.env.TURSO_AUTH_TOKEN?.trim();
+const adapter = new PrismaLibSql({
+  url: databaseUrl,
+  ...(authToken ? { authToken } : {}),
+});
 const db = new PrismaClient({ adapter });
 
 const upsertDict = (category: string, items: { value: string; label: string; sortOrder?: number }[]) =>
