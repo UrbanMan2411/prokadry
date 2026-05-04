@@ -205,9 +205,10 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
             />
           );
         case 'messages':
-          return <EmployerMessages messages={messages} onMarkRead={id => {
-            setMessages(prev => prev.map(m => m.id === id ? { ...m, isRead: true } : m));
-            fetch(`/api/messages/${id}`, { method: 'PATCH' }).catch(() => {});
+          return <EmployerMessages messages={messages} onMarkRead={threadId => {
+            setMessages(prev => prev.map(m => m.counterpartyUserId === threadId ? { ...m, isRead: true } : m));
+            messages.filter(m => m.counterpartyUserId === threadId && !m.isRead)
+              .forEach(m => fetch(`/api/messages/${m.id}`, { method: 'PATCH' }).catch(() => {}));
           }} />;
         case 'invitations':
           return <EmployerInvitations invitations={invitations} setInvitations={setInvitations} />;
@@ -229,9 +230,10 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
         case 'seeker-invitations':
           return <SeekerInvitations invitations={invitations} setInvitations={setInvitations} />;
         case 'seeker-messages':
-          return <SeekerMessages messages={messages} email={email} onMarkRead={id => {
-            setMessages(prev => prev.map(m => m.id === id ? { ...m, isRead: true } : m));
-            fetch(`/api/messages/${id}`, { method: 'PATCH' }).catch(() => {});
+          return <SeekerMessages messages={messages} email={email} onMarkRead={threadId => {
+            setMessages(prev => prev.map(m => m.counterpartyUserId === threadId ? { ...m, isRead: true } : m));
+            messages.filter(m => m.counterpartyUserId === threadId && !m.isRead)
+              .forEach(m => fetch(`/api/messages/${m.id}`, { method: 'PATCH' }).catch(() => {}));
           }} />;
         case 'seeker-settings':
           return <SeekerSettings />;
