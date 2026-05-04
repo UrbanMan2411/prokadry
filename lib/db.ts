@@ -13,11 +13,17 @@ function resolveWritableDatabaseUrl() {
 
   if (!dbUrl.startsWith('file:')) return dbUrl;
 
+  const filePath = dbUrl.replace(/^file:/, '');
+
+  // Absolute path (production VPS): use directly — no copy needed
+  if (path.isAbsolute(filePath)) return dbUrl;
+
+  // Relative path: copy to /tmp for read-only environments (Vercel)
   const tmpDb = path.join(os.tmpdir(), 'prokadry.db');
   if (dbUrl.includes(tmpDb.replace(/\\/g, '/'))) return dbUrl;
 
   try {
-    const src = path.resolve(process.cwd(), dbUrl.replace(/^file:/, '').replace(/^\.\//, ''));
+    const src = path.resolve(process.cwd(), filePath.replace(/^\.\//, ''));
 
     if (fs.existsSync(src)) {
       const srcMtime = fs.statSync(src).mtimeMs;
