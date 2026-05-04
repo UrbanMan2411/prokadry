@@ -2,7 +2,6 @@
 
 import { ReactNode, useState, useRef, useEffect } from 'react';
 import type { Role } from '@/lib/types';
-import { signOut } from '@/app/actions/auth';
 
 type Page = string;
 
@@ -165,17 +164,15 @@ export function Header({
         <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${avatarColors[role]} flex items-center justify-center text-white text-xs font-semibold shadow flex-shrink-0`}>
           {initial}
         </div>
-        <form action={signOut}>
-          <button
-            type="submit"
-            title="Выйти"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition flex-shrink-0"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-          </button>
-        </form>
+        <a
+          href="/api/auth/signout"
+          title="Выйти"
+          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition flex-shrink-0"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+        </a>
       </div>
     </header>
   );
