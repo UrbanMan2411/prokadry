@@ -32,8 +32,9 @@ yarn-error.log*
 
 # env files — keep local secrets out of git
 .env*
-# but DO commit the demo database (seeded accounts)
-!dev.db
+# database files — never commit, seed via deploy script
+dev.db
+prisma/dev.db
 
 # vercel
 .vercel
