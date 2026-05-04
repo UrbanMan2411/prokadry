@@ -1,7 +1,12 @@
-import { type NextRequest, NextResponse } from 'next/server';
-import { deleteSession } from '@/lib/session';
+import { NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest) {
-  await deleteSession();
-  return NextResponse.redirect(new URL('/auth', request.url), { status: 302 });
+const COOKIE = 'prokadry_session';
+
+export async function GET() {
+  const response = new NextResponse(null, {
+    status: 302,
+    headers: { Location: '/auth' },
+  });
+  response.cookies.set(COOKIE, '', { maxAge: 0, path: '/' });
+  return response;
 }
