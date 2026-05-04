@@ -350,11 +350,14 @@ export function AdminUsers({ employers: _ }: { employers: Employer[] }) {
   const [search, setSearch] = useState('');
   const [users, setUsers] = useState<UserRow[]>([]);
   useEffect(() => {
-    fetch('/api/admin/users').then(r => r.json()).then(setUsers).catch(() => {});
+    fetch('/api/admin/users')
+      .then(r => r.ok ? r.json() : [])
+      .then(data => { if (Array.isArray(data)) setUsers(data); })
+      .catch(() => {});
   }, []);
   const filtered = users.filter(u =>
-    u.name.toLowerCase().includes(search.toLowerCase()) ||
-    u.email.toLowerCase().includes(search.toLowerCase())
+    (u.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (u.email ?? '').toLowerCase().includes(search.toLowerCase())
   );
 
   const toggleActive = (id: string, current: boolean) => {
