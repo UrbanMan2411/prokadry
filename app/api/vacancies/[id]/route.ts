@@ -3,6 +3,35 @@ import { db } from '@/lib/db';
 import { getSession } from '@/lib/session';
 import type { Vacancy } from '@/lib/types';
 
+async function saveVacancyTags(
+  vacancyId: string,
+  skills?: string[],
+  activityAreas?: string[],
+  purchaseTypes?: string[],
+) {
+  if (Array.isArray(skills)) {
+    await db.vacancySkill.deleteMany({ where: { vacancyId } });
+    for (const v of skills) {
+      const item = await db.dictItem.findFirst({ where: { category: 'SKILL', value: v }, select: { id: true } });
+      if (item) await db.vacancySkill.create({ data: { vacancyId, dictItemId: item.id } }).catch(() => {});
+    }
+  }
+  const areaValues: { cat: 'ACTIVITY_AREA' | 'PURCHASE_TYPE'; arr: string[] }[] = [];
+  if (Array.isArray(activityAreas)) areaValues.push({ cat: 'ACTIVITY_AREA', arr: activityAreas });
+  if (Array.isArray(purchaseTypes)) areaValues.push({ cat: 'PURCHASE_TYPE', arr: purchaseTypes });
+  for (const { cat, arr } of areaValues) {
+    const existing = await db.vacancyActivityArea.findMany({
+      where: { vacancyId, dictItem: { category: cat as never } },
+      select: { dictItemId: true },
+    });
+    await db.vacancyActivityArea.deleteMany({ where: { vacancyId, dictItemId: { in: existing.map(e => e.dictItemId) } } });
+    for (const v of arr) {
+      const item = await db.dictItem.findFirst({ where: { category: cat as never, value: v }, select: { id: true } });
+      if (item) await db.vacancyActivityArea.create({ data: { vacancyId, dictItemId: item.id } }).catch(() => {});
+    }
+  }
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -28,7 +57,7 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { status, title, department, city, workMode, salaryFrom, salaryTo, description } = body;
+    const { status, title, department, city, workMode, salaryFrom, salaryTo, description, skills, activityAreas, purchaseTypes } = body;
 
     const updateData: Record<string, unknown> = {};
     if (status !== undefined) {
@@ -43,14 +72,18 @@ export async function PATCH(
     if (salaryTo !== undefined) updateData.salaryTo = salaryTo ? Number(salaryTo) : null;
     if (description !== undefined) updateData.description = description || null;
 
-    const row = await db.vacancy.update({
+    await db.vacancy.update({ where: { id }, data: updateData });
+    await saveVacancyTags(id, skills, activityAreas, purchaseTypes);
+
+    const row = await db.vacancy.findUnique({
       where: { id },
-      data: updateData,
       include: {
         employer: { select: { id: true, name: true } },
         skills: { include: { dictItem: true } },
+        activityAreas: { include: { dictItem: true } },
       },
     });
+    if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     const vacancy: Vacancy = {
       id: row.id,
@@ -65,8 +98,8 @@ export async function PATCH(
       salaryTo: row.salaryTo ?? 0,
       description: row.description ?? '',
       skills: row.skills.map(s => s.dictItem.label),
-      clientSpheres: [],
-      specialistActivities: [],
+      clientSpheres: row.activityAreas.filter(a => a.dictItem.category === 'ACTIVITY_AREA').map(a => a.dictItem.label),
+      specialistActivities: row.activityAreas.filter(a => a.dictItem.category === 'PURCHASE_TYPE').map(a => a.dictItem.label),
       status: row.status.toLowerCase() as Vacancy['status'],
       createdAt: row.createdAt.toISOString(),
     };

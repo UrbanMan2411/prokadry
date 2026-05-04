@@ -314,18 +314,36 @@ export function AdminVacancies({ vacancies, setVacancies }: {
   vacancies: Vacancy[]; setVacancies: (fn: (prev: Vacancy[]) => Vacancy[]) => void;
 }) {
   const [search, setSearch] = useState('');
-  const filtered = vacancies.filter(v => v.title.toLowerCase().includes(search.toLowerCase()) || v.employerName.toLowerCase().includes(search.toLowerCase()));
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'draft' | 'archived'>('all');
+
+  const filtered = vacancies.filter(v => {
+    const matchText = v.title.toLowerCase().includes(search.toLowerCase()) || v.employerName.toLowerCase().includes(search.toLowerCase());
+    const matchStatus = statusFilter === 'all' || v.status === statusFilter;
+    return matchText && matchStatus;
+  });
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-5">
         <h1 className="text-xl font-bold text-slate-800">Все вакансии</h1>
-        <p className="text-sm text-slate-500 mt-0.5">{vacancies.filter(v => v.status === 'active').length} активных</p>
+        <p className="text-sm text-slate-500 mt-0.5">
+          {vacancies.filter(v => v.status === 'active').length} активных · {vacancies.filter(v => v.status === 'draft').length} черновиков · {vacancies.filter(v => v.status === 'archived').length} в архиве
+        </p>
       </div>
-      <div className="mb-4">
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <Input value={search} onChange={setSearch} placeholder="Поиск по вакансии, работодателю..."
           prefix={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>}
+          className="flex-1"
         />
+        <div className="flex gap-1 bg-slate-100 p-1 rounded-lg flex-shrink-0">
+          {([['all', 'Все'], ['active', 'Активные'], ['draft', 'Черновики'], ['archived', 'Архив']] as const).map(([k, label]) => (
+            <button key={k} onClick={() => setStatusFilter(k)}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${statusFilter === k ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              {label}
+              {k !== 'all' && <span className="ml-1 text-slate-400">({vacancies.filter(v => v.status === k).length})</span>}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
         <table className="w-full text-sm">

@@ -171,20 +171,68 @@ export function EmployerDashboard({
 }
 
 // ── Vacancies — card layout ────────────────────────────────────────────────
+type DictOpt = { value: string; label: string };
+
+function TagPicker({ label, options, selected, onChange }: {
+  label: string; options: DictOpt[]; selected: string[]; onChange: (v: string[]) => void;
+}) {
+  return (
+    <div className="col-span-2">
+      <label className="text-xs font-medium text-slate-600 mb-1.5 block">{label}</label>
+      <div className="flex flex-wrap gap-1.5 min-h-[28px]">
+        {options.length === 0 && <span className="text-xs text-slate-400 italic">Нет элементов</span>}
+        {options.map(opt => {
+          const active = selected.includes(opt.label);
+          return (
+            <button
+              key={opt.value} type="button"
+              onClick={() => onChange(active ? selected.filter(s => s !== opt.label) : [...selected, opt.label])}
+              className={`text-xs px-2.5 py-1 rounded-full border transition ${active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400'}`}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function VacancyModal({
   open, onClose, vacancy, onSave,
 }: {
   open: boolean; onClose: () => void; vacancy: Vacancy | null; onSave: (form: Partial<Vacancy>) => void;
 }) {
-  const blank = { title: '', department: '', city: '', workMode: 'Офис', salaryFrom: 0, salaryTo: 0, description: '', status: 'active' as const };
+  const blank: Partial<Vacancy> = { title: '', department: '', city: '', workMode: 'Офис', salaryFrom: 0, salaryTo: 0, description: '', status: 'active' as const, skills: [], clientSpheres: [], specialistActivities: [] };
   const [form, setForm] = useState<Partial<Vacancy>>(vacancy ?? blank);
   const upd = <K extends keyof Vacancy>(k: K, v: Vacancy[K]) => setForm(f => ({ ...f, [k]: v }));
 
+  const [dictSkills, setDictSkills] = useState<DictOpt[]>([]);
+  const [dictAreas, setDictAreas] = useState<DictOpt[]>([]);
+  const [dictPurchase, setDictPurchase] = useState<DictOpt[]>([]);
+  const [empStatus, setEmpStatus] = useState('');
+
   useEffect(() => { setForm(vacancy ?? blank); }, [vacancy, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    fetch('/api/dict?category=SKILL').then(r => r.ok ? r.json() : []).then(setDictSkills).catch(() => {});
+    fetch('/api/dict?category=ACTIVITY_AREA').then(r => r.ok ? r.json() : []).then(setDictAreas).catch(() => {});
+    fetch('/api/dict?category=PURCHASE_TYPE').then(r => r.ok ? r.json() : []).then(setDictPurchase).catch(() => {});
+    fetch('/api/employers/me').then(r => r.ok ? r.json() : {}).then((d: { status?: string }) => setEmpStatus(d.status ?? '')).catch(() => {});
+  }, [open]);
 
   return (
     <Modal open={open} onClose={onClose} title={vacancy ? 'Редактировать вакансию' : 'Новая вакансия'} size="lg">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        {empStatus === 'pending' && (
+          <div className="col-span-2 flex items-start gap-2 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+            <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+            <p className="text-xs text-amber-700">Аккаунт ожидает проверки — вакансия сохранится как черновик до одобрения администратором.</p>
+          </div>
+        )}
         <div className="col-span-2">
           <label className="text-xs font-medium text-slate-600 mb-1 block">Название вакансии</label>
           <Input value={form.title ?? ''} onChange={v => upd('title', v)} placeholder="Специалист по закупкам" />
@@ -219,11 +267,14 @@ function VacancyModal({
         <div className="col-span-2">
           <label className="text-xs font-medium text-slate-600 mb-1 block">Описание</label>
           <textarea
-            value={form.description ?? ''} onChange={e => upd('description', e.target.value)} rows={4}
+            value={form.description ?? ''} onChange={e => upd('description', e.target.value)} rows={3}
             placeholder="Требования, условия, обязанности..."
             className="w-full rounded-lg border border-slate-200 text-sm px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           />
         </div>
+        <TagPicker label="Навыки / специализации" options={dictSkills} selected={form.skills ?? []} onChange={v => upd('skills', v)} />
+        <TagPicker label="Сферы деятельности клиентов" options={dictAreas} selected={form.clientSpheres ?? []} onChange={v => upd('clientSpheres', v)} />
+        <TagPicker label="Виды закупок" options={dictPurchase} selected={form.specialistActivities ?? []} onChange={v => upd('specialistActivities', v)} />
       </div>
       <div className="flex justify-end gap-2">
         <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
@@ -251,18 +302,27 @@ export function EmployerVacancies({
   });
 
   const handleSave = async (form: Partial<Vacancy>) => {
+    const body = {
+      ...form,
+      activityAreas: form.clientSpheres ?? [],
+      purchaseTypes: form.specialistActivities ?? [],
+    };
     if (editing) {
       setVacancies(prev => prev.map(v => v.id === editing.id ? { ...v, ...form } : v));
-      fetch(`/api/vacancies/${editing.id}`, {
+      const res = await fetch(`/api/vacancies/${editing.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      }).catch(() => {});
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        const updated: Vacancy = await res.json();
+        setVacancies(prev => prev.map(v => v.id === editing.id ? updated : v));
+      }
     } else {
       const res = await fetch('/api/vacancies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
         const newV: Vacancy = await res.json();

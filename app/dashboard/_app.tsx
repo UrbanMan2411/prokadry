@@ -26,6 +26,14 @@ const DEFAULT_PAGE: Record<Role, string> = {
   admin: 'admin-dashboard',
 };
 
+function on401() { window.location.href = '/auth'; }
+
+async function apiFetch(url: string): Promise<Response | null> {
+  const r = await fetch(url);
+  if (r.status === 401) { on401(); return null; }
+  return r;
+}
+
 export default function ClientApp({ initialRole, email }: { initialRole: Role; email: string }) {
   const [role, setRole] = useState<Role>(initialRole);
   const [page, setPage] = useState<string>(DEFAULT_PAGE[initialRole]);
@@ -36,21 +44,46 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
+  // Read page from URL on mount
   useEffect(() => {
-    fetch('/api/resumes').then(r => r.json()).then(setResumes).catch(() => {});
-    fetch('/api/vacancies').then(r => r.json()).then(setVacancies).catch(() => {});
-    fetch('/api/messages').then(r => r.json()).then(setMessages).catch(() => {});
-    fetch('/api/invitations').then(r => r.json()).then(setInvitations).catch(() => {});
+    const p = new URLSearchParams(window.location.search).get('page');
+    if (p) setPage(p);
+  }, []);
+
+  // Sync page → URL
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('page') !== page) {
+      url.searchParams.set('page', page);
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [page]);
+
+  // Document title with unread badge
+  useEffect(() => {
+    const count = role === 'employer'
+      ? messages.filter(m => !m.isRead && m.fromRole === 'candidate').length
+      : role === 'seeker'
+      ? invitations.filter(i => i.status === 'sent').length + messages.filter(m => !m.isRead && m.fromRole === 'employer').length
+      : resumes.filter(r => r.status === 'pending').length;
+    document.title = count > 0 ? `ПРОкадры (${count})` : 'ПРОкадры';
+  }, [role, messages, invitations, resumes]);
+
+  useEffect(() => {
+    apiFetch('/api/resumes').then(r => r?.ok ? r.json() : null).then(d => { if (d) setResumes(d); }).catch(() => {});
+    apiFetch('/api/vacancies').then(r => r?.ok ? r.json() : null).then(d => { if (d) setVacancies(d); }).catch(() => {});
+    apiFetch('/api/messages').then(r => r?.ok ? r.json() : null).then(d => { if (d) setMessages(d); }).catch(() => {});
+    apiFetch('/api/invitations').then(r => r?.ok ? r.json() : null).then(d => { if (d) setInvitations(d); }).catch(() => {});
     if (initialRole === 'admin') {
-      fetch('/api/employers').then(r => r.json()).then(setEmployers).catch(() => {});
-      fetch('/api/admin/logs').then(r => r.ok ? r.json() : []).then(setAuditLogs).catch(() => {});
+      apiFetch('/api/employers').then(r => r?.ok ? r.json() : null).then(d => { if (d) setEmployers(d); }).catch(() => {});
+      apiFetch('/api/admin/logs').then(r => r?.ok ? r.json() : null).then(d => { if (d) setAuditLogs(d); }).catch(() => {});
     }
   }, [initialRole]);
 
   useEffect(() => {
     const poll = setInterval(() => {
-      fetch('/api/messages').then(r => r.ok ? r.json() : null).then(data => { if (data) setMessages(data); }).catch(() => {});
-      fetch('/api/invitations').then(r => r.ok ? r.json() : null).then(data => { if (data) setInvitations(data); }).catch(() => {});
+      apiFetch('/api/messages').then(r => r?.ok ? r.json() : null).then(data => { if (data) setMessages(data); }).catch(() => {});
+      apiFetch('/api/invitations').then(r => r?.ok ? r.json() : null).then(data => { if (data) setInvitations(data); }).catch(() => {});
     }, 30000);
     return () => clearInterval(poll);
   }, []);
