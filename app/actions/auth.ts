@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import bcrypt from 'bcryptjs';
 import { db } from '@/lib/db';
 import { createSession, deleteSession } from '@/lib/session';
+import { logAction } from '@/lib/audit';
 
 // ── Sign In ──────────────────────────────────────────────────────────────────
 
@@ -33,6 +34,7 @@ export async function signIn(
     console.warn('[auth] lastLoginAt update skipped:', error);
   }
 
+  logAction(user.id, 'USER_LOGIN', 'User', user.id, user.email);
   await createSession({ userId: user.id, email: user.email, role: user.role });
   redirect('/dashboard');
 }

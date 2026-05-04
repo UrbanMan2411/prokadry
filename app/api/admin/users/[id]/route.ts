@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSession } from '@/lib/session';
+import { logAction } from '@/lib/audit';
 
 export async function PATCH(
   req: NextRequest,
@@ -18,7 +19,9 @@ export async function PATCH(
       return NextResponse.json({ error: 'Missing isActive' }, { status: 400 });
     }
 
+    const user = await db.user.findUnique({ where: { id }, select: { email: true } });
     await db.user.update({ where: { id }, data: { isActive } });
+    logAction(session.userId, isActive ? 'USER_UNBLOCKED' : 'USER_BLOCKED', 'User', id, user?.email);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error('[api/admin/users/[id] PATCH]', err);

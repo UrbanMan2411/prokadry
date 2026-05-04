@@ -88,6 +88,9 @@ enum AuditAction {
   DICT_ITEM_CREATED
   DICT_ITEM_UPDATED
   DICT_ITEM_DISABLED
+  USER_BLOCKED
+  USER_UNBLOCKED
+  EMPLOYER_REGISTERED_BY_ADMIN
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

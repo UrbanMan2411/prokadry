@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSession } from '@/lib/session';
+import { logAction } from '@/lib/audit';
 
 export async function PATCH(
   req: NextRequest,
@@ -28,8 +29,16 @@ export async function PATCH(
         status: dbStatus as 'APPROVED' | 'PENDING' | 'SUSPENDED',
         approvedAt: dbStatus === 'APPROVED' ? new Date() : undefined,
       },
+      select: { id: true, status: true, name: true },
     });
 
+    const actionMap: Record<string, 'EMPLOYER_APPROVED' | 'EMPLOYER_SUSPENDED'> = {
+      APPROVED: 'EMPLOYER_APPROVED',
+      SUSPENDED: 'EMPLOYER_SUSPENDED',
+    };
+    if (actionMap[dbStatus]) {
+      logAction(session.userId, actionMap[dbStatus], 'Employer', id, updated.name);
+    }
     return NextResponse.json({ id: updated.id, status: updated.status.toLowerCase() });
   } catch (err) {
     console.error('[api/employers/[id] PATCH]', err);

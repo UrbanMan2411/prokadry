@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getSession } from '@/lib/session';
+import { logAction } from '@/lib/audit';
 
 export async function PATCH(
   req: NextRequest,
@@ -192,7 +193,17 @@ export async function PATCH(
       if (rejectReason !== undefined) data.rejectReason = rejectReason || null;
       if (dbStatus === 'ACTIVE') data.publishedAt = new Date();
 
+      const existing2 = await db.resume.findUnique({ where: { id }, select: { firstName: true, lastName: true } });
       const updated = await db.resume.update({ where: { id }, data });
+      const resumeName = existing2 ? `${existing2.lastName} ${existing2.firstName}` : id;
+      const actionMap: Record<string, 'RESUME_APPROVED' | 'RESUME_REJECTED' | 'RESUME_ARCHIVED'> = {
+        ACTIVE: 'RESUME_APPROVED',
+        REJECTED: 'RESUME_REJECTED',
+        ARCHIVED: 'RESUME_ARCHIVED',
+      };
+      if (actionMap[dbStatus]) {
+        logAction(session.userId, actionMap[dbStatus], 'Resume', id, resumeName);
+      }
       return NextResponse.json({ id: updated.id, status: updated.status.toLowerCase() });
     }
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import type { Role } from '@/lib/types';
-import type { Resume, Vacancy, Employer, Message, Invitation } from '@/lib/types';
+import type { Resume, Vacancy, Employer, Message, Invitation, AuditLog } from '@/lib/types';
 import { AppShell } from '@/components/layout';
 import { ResumeRegistry } from '@/components/registry';
 import { ResumeDetail, InviteModal } from '@/components/resume';
@@ -34,6 +34,7 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
   const [employers, setEmployers] = useState<Employer[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
   useEffect(() => {
     fetch('/api/resumes').then(r => r.json()).then(setResumes).catch(() => {});
@@ -42,6 +43,7 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
     fetch('/api/invitations').then(r => r.json()).then(setInvitations).catch(() => {});
     if (initialRole === 'admin') {
       fetch('/api/employers').then(r => r.json()).then(setEmployers).catch(() => {});
+      fetch('/api/admin/logs').then(r => r.ok ? r.json() : []).then(setAuditLogs).catch(() => {});
     }
   }, [initialRole]);
   const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
@@ -194,7 +196,7 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
     if (role === 'admin') {
       switch (page) {
         case 'admin-dashboard':
-          return <AdminDashboard logs={[]} />;
+          return <AdminDashboard logs={auditLogs} />;
         case 'admin-resumes':
           return <AdminResumes resumes={resumes} setResumes={setResumes} />;
         case 'admin-employers':
@@ -214,7 +216,7 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
         case 'admin-import':
           return <AdminImport />;
         case 'admin-logs':
-          return <AdminLogs logs={[]} />;
+          return <AdminLogs logs={auditLogs} />;
       }
     }
 
