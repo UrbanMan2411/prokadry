@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
 
       const vacancy = await db.vacancy.findUnique({
         where: { id: vacancyId },
-        include: { employer: { select: { name: true } } },
+        include: { employer: { select: { name: true, userId: true } } },
       });
       if (!vacancy) return NextResponse.json({ error: 'Vacancy not found' }, { status: 404 });
 
@@ -92,6 +92,17 @@ export async function POST(req: NextRequest) {
           vacancy: { select: { title: true, employer: { select: { name: true } } } },
         },
       });
+
+      // Auto-start chat: seeker → employer
+      if (vacancy.employer.userId) {
+        await db.message.create({
+          data: {
+            senderId: session.userId,
+            recipientId: vacancy.employer.userId,
+            text: `Здравствуйте! Меня заинтересовала ваша вакансия «${vacancy.title}».`,
+          },
+        }).catch(() => {});
+      }
 
       const inv: Invitation = {
         id: row.id,
@@ -125,10 +136,15 @@ export async function POST(req: NextRequest) {
     const row = await db.invitation.create({
       data: { resumeId, vacancyId, message, status: 'SENT' },
       include: {
-        resume: { select: { firstName: true, lastName: true } },
+        resume: { select: { firstName: true, lastName: true, userId: true } },
         vacancy: { select: { title: true, employer: { select: { name: true } } } },
       },
     });
+
+    // Auto-start chat: employer → seeker
+    await db.message.create({
+      data: { senderId: session.userId, recipientId: row.resume.userId, text: message },
+    }).catch(() => {});
 
     const invitation: Invitation = {
       id: row.id,
