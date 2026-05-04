@@ -6,6 +6,24 @@ import { db } from '@/lib/db';
 import { createSession, deleteSession } from '@/lib/session';
 import { logAction } from '@/lib/audit';
 
+// ── Rate limiting ─────────────────────────────────────────────────────────────
+const loginAttempts = new Map<string, { count: number; firstAt: number }>();
+const RATE_WINDOW = 15 * 60 * 1000; // 15 min
+const RATE_LIMIT = 5;
+
+function checkRateLimit(key: string): boolean {
+  const now = Date.now();
+  const rec = loginAttempts.get(key);
+  if (!rec || now - rec.firstAt > RATE_WINDOW) return true; // window expired → ok
+  return rec.count < RATE_LIMIT;
+}
+function recordFailure(key: string) {
+  const now = Date.now();
+  const rec = loginAttempts.get(key);
+  if (!rec || now - rec.firstAt > RATE_WINDOW) { loginAttempts.set(key, { count: 1, firstAt: now }); return; }
+  loginAttempts.set(key, { count: rec.count + 1, firstAt: rec.firstAt });
+}
+
 // ── Sign In ──────────────────────────────────────────────────────────────────
 
 export type SignInState = { error?: string } | undefined;
@@ -19,11 +37,17 @@ export async function signIn(
 
   if (!email || !password) return { error: 'Заполните все поля' };
 
+  if (!checkRateLimit(email)) {
+    return { error: 'Слишком много попыток. Попробуйте через 15 минут.' };
+  }
+
   const user = await db.user.findUnique({ where: { email } });
-  if (!user || !user.isActive) return { error: 'Неверный email или пароль' };
+  if (!user || !user.isActive) { recordFailure(email); return { error: 'Неверный email или пароль' }; }
 
   const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) return { error: 'Неверный email или пароль' };
+  if (!ok) { recordFailure(email); return { error: 'Неверный email или пароль' }; }
+
+  loginAttempts.delete(email);
 
   try {
     await db.user.update({

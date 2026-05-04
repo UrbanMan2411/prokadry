@@ -15,14 +15,19 @@ export async function PATCH(
 
     const { status } = await req.json();
     const dbStatus = String(status).toUpperCase();
-    if (!['ACCEPTED', 'REJECTED'].includes(dbStatus)) {
+    const seekerAllowed = ['ACCEPTED', 'REJECTED', 'VIEWED'];
+    const employerAllowed = ['ACCEPTED', 'REJECTED'];
+    if (session.role === 'SEEKER' && !seekerAllowed.includes(dbStatus)) {
+      return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
+    }
+    if (session.role === 'EMPLOYER' && !employerAllowed.includes(dbStatus)) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
     }
 
     if (session.role === 'SEEKER') {
-      const resume = await db.resume.findFirst({ where: { userId: session.userId }, select: { id: true } });
-      if (!resume) return NextResponse.json({ error: 'Resume not found' }, { status: 404 });
-      const existing = await db.invitation.findFirst({ where: { id, resumeId: resume.id } });
+      const resumes = await db.resume.findMany({ where: { userId: session.userId }, select: { id: true } });
+      const resumeIds = resumes.map(r => r.id);
+      const existing = await db.invitation.findFirst({ where: { id, resumeId: { in: resumeIds } } });
       if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     } else {
       const emp = await db.employer.findUnique({ where: { userId: session.userId }, select: { id: true } });
@@ -31,9 +36,12 @@ export async function PATCH(
       if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
+    const updateData: Record<string, unknown> = { status: dbStatus };
+    if (dbStatus === 'VIEWED') updateData.viewedAt = new Date();
+    else updateData.respondedAt = new Date();
     const updated = await db.invitation.update({
       where: { id },
-      data: { status: dbStatus as 'ACCEPTED' | 'REJECTED', respondedAt: new Date() },
+      data: updateData as never,
     });
 
     return NextResponse.json({ id: updated.id, status: updated.status.toLowerCase() });

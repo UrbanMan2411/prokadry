@@ -46,6 +46,14 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
       fetch('/api/admin/logs').then(r => r.ok ? r.json() : []).then(setAuditLogs).catch(() => {});
     }
   }, [initialRole]);
+
+  useEffect(() => {
+    const poll = setInterval(() => {
+      fetch('/api/messages').then(r => r.ok ? r.json() : null).then(data => { if (data) setMessages(data); }).catch(() => {});
+      fetch('/api/invitations').then(r => r.ok ? r.json() : null).then(data => { if (data) setInvitations(data); }).catch(() => {});
+    }, 30000);
+    return () => clearInterval(poll);
+  }, []);
   const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
   const [inviteTarget, setInviteTarget] = useState<Resume | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -139,6 +147,7 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
               resumes={resumes}
               setResumes={setResumes}
               vacancies={vacancies}
+              invitations={invitations}
               onOpenResume={handleOpenResume}
               onInvite={handleInvite}
               onMessage={r => { setMsgTarget(r); setMsgOpen(true); }}
@@ -177,7 +186,7 @@ export default function ClientApp({ initialRole, email }: { initialRole: Role; e
     if (role === 'seeker') {
       switch (page) {
         case 'seeker-dashboard':
-          return <SeekerDashboard invitations={invitations} messages={messages} />;
+          return <SeekerDashboard invitations={invitations} messages={messages} resumeStatus={resumes[0]?.status} />;
         case 'my-resume':
           return <MyResume />;
         case 'seeker-vacancies':

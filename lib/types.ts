@@ -52,6 +52,7 @@ export interface Resume {
   purchaseTypes: string[];
   tests: ResumeTest[];
   specialStatuses: SpecialStatus[];
+  birthDate?: string;
   hasPhoto: boolean;
   photo: string | null;
   publishedAt: string;

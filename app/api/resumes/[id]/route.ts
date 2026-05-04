@@ -22,7 +22,7 @@ export async function PATCH(
       if (!resume) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
       const {
-        firstName, lastName, patronymic, gender,
+        firstName, lastName, patronymic, gender, birthDate,
         photoUrl,
         position, city, salary, experience,
         education, educationInstitution, educationYears,
@@ -41,6 +41,7 @@ export async function PATCH(
       if (lastName !== undefined) data.lastName = lastName;
       if (patronymic !== undefined) data.patronymic = patronymic || null;
       if (gender !== undefined && ['MALE', 'FEMALE'].includes(String(gender).toUpperCase())) data.gender = String(gender).toUpperCase();
+      if (birthDate !== undefined && birthDate) { const d = new Date(birthDate); if (!isNaN(d.getTime())) data.birthDate = d; }
       if (photoUrl !== undefined) { data.photoUrl = photoUrl || null; data.hasPhoto = !!photoUrl; }
       if (position !== undefined) data.position = position;
       if (city !== undefined) data.city = city;
@@ -210,6 +211,32 @@ export async function PATCH(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   } catch (err) {
     console.error('[api/resumes/[id] PATCH]', err);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await params;
+    const session = await getSession();
+    if (!session || session.role !== 'SEEKER') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const resume = await db.resume.findFirst({
+      where: { id, userId: session.userId },
+      select: { id: true, status: true },
+    });
+    if (!resume) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (resume.status === 'ACTIVE') {
+      return NextResponse.json({ error: 'Нельзя удалить активное резюме. Сначала снимите с публикации.' }, { status: 409 });
+    }
+    await db.resume.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error('[api/resumes/[id] DELETE]', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

@@ -8,9 +8,10 @@ import { DICTIONARIES } from '@/lib/mock-data';
 import { RUSSIA_CITIES, useRussiaMap, type MapCity } from '@/lib/use2gis';
 
 // ── Seeker Dashboard ───────────────────────────────────────────────────────
-export function SeekerDashboard({ invitations, messages }: { invitations: Invitation[]; messages: Message[] }) {
+export function SeekerDashboard({ invitations, messages, resumeStatus }: { invitations: Invitation[]; messages: Message[]; resumeStatus?: string }) {
   const pendingInv = invitations.filter(i => i.status === 'sent' || i.status === 'viewed').length;
   const unreadMsg = messages.filter(m => !m.isRead).length;
+  const resumeStatusLabel: Record<string, string> = { active: 'Активно', pending: 'На проверке', draft: 'Черновик', rejected: 'Отклонено', archived: 'В архиве' };
 
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto">
@@ -30,7 +31,7 @@ export function SeekerDashboard({ invitations, messages }: { invitations: Invita
             <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
           </svg>
         } />
-        <StatCard label="Статус резюме" value="Активно" color="green" icon={
+        <StatCard label="Статус резюме" value={resumeStatus ? (resumeStatusLabel[resumeStatus] ?? resumeStatus) : '—'} color={resumeStatus === 'active' ? 'green' : resumeStatus === 'pending' ? 'amber' : 'blue'} icon={
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
@@ -89,7 +90,7 @@ type TestEntry = { value: string; passedAt: string };
 
 type ResumeFormFull = {
   dbId: string; dbStatus: string;
-  firstName: string; lastName: string; patronymic: string; gender: string;
+  firstName: string; lastName: string; patronymic: string; gender: string; birthDate: string;
   city: string; phone: string; email: string; photoUrl: string;
   position: string; positionValid: boolean; salary: string; workMode: string;
   experience: string; education: string; educationInstitution: string; educationYears: string;
@@ -102,7 +103,7 @@ type ResumeFormFull = {
 
 const emptyForm = (): ResumeFormFull => ({
   dbId: '', dbStatus: 'draft',
-  firstName: '', lastName: '', patronymic: '', gender: 'FEMALE',
+  firstName: '', lastName: '', patronymic: '', gender: 'FEMALE', birthDate: '',
   city: '', phone: '', email: '', photoUrl: '',
   position: '', positionValid: true, salary: '', workMode: 'Офис',
   experience: '0', education: 'Высшее', educationInstitution: '', educationYears: '',
@@ -451,6 +452,7 @@ function resumeToForm(r: import('@/lib/types').Resume): ResumeFormFull {
   return {
     dbId: r.id, dbStatus: r.status,
     firstName: r.firstName, lastName: r.lastName, patronymic: r.patronymic ?? '', gender: r.gender,
+    birthDate: r.birthDate ?? '',
     city: r.city, phone: '', email: '', photoUrl: r.photo ?? '',
     position: r.position, positionValid: true, salary: r.salary ? String(r.salary) : '', workMode: r.workMode,
     experience: String(r.experience), education: r.education,
@@ -499,6 +501,14 @@ export function MyResume() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (!saved && form.dbId) { e.preventDefault(); e.returnValue = ''; }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [saved, form.dbId]);
+
   const upd = (k: keyof ResumeFormFull, v: unknown) => { setForm(f => ({ ...f, [k]: v })); setSaved(false); };
 
   const createNewResume = async () => {
@@ -513,6 +523,20 @@ export function MyResume() {
     } finally { setCreating(false); }
   };
 
+  const deleteResume = async () => {
+    if (!form.dbId) return;
+    if (!confirm('Удалить это резюме? Это действие необратимо.')) return;
+    const res = await fetch(`/api/resumes/${form.dbId}`, { method: 'DELETE' });
+    if (res.ok) {
+      loadResumes();
+      setForm(emptyForm());
+      setSaved(false);
+    } else {
+      const d = await res.json().catch(() => ({}));
+      alert(d.error ?? 'Ошибка удаления');
+    }
+  };
+
   const saveToDb = async (newStatus?: string) => {
     if (!form.dbId) return;
     if (!form.positionValid && form.position) { upd('positionValid', false); return; }
@@ -520,7 +544,7 @@ export function MyResume() {
     try {
       const body: Record<string, unknown> = {
         firstName: form.firstName, lastName: form.lastName, patronymic: form.patronymic,
-        gender: form.gender,
+        gender: form.gender, birthDate: form.birthDate || undefined,
         position: form.position, city: form.city,
         photoUrl: form.photoUrl || null,
         salary: form.salary || null, experience: form.experience,
@@ -622,6 +646,14 @@ export function MyResume() {
           >
             {creating ? '...' : '+ Новое резюме'}
           </button>
+          {form.dbId && form.dbStatus !== 'active' && (
+            <button
+              onClick={deleteResume}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition"
+            >
+              Удалить
+            </button>
+          )}
           {form.dbStatus && (
             <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_COLORS[form.dbStatus] ?? 'text-slate-500 bg-slate-100'}`}>
               {STATUS_LABELS[form.dbStatus] ?? form.dbStatus}
@@ -689,6 +721,12 @@ export function MyResume() {
                 <label className="text-xs font-medium text-slate-600 mb-1 block">Пол</label>
                 <Select value={form.gender} onChange={v => upd('gender', v)}
                   options={[{ value: 'FEMALE', label: 'Женский' }, { value: 'MALE', label: 'Мужской' }]} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600 mb-1 block">Дата рождения</label>
+                <input type="date" value={form.birthDate} onChange={e => upd('birthDate', e.target.value)}
+                  max={new Date().toISOString().slice(0, 10)}
+                  className="w-full rounded-lg border border-slate-200 bg-white text-sm text-slate-800 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
             </div>
           </div>
@@ -924,6 +962,20 @@ export function MyResume() {
 
 // ── Seeker Invitations ─────────────────────────────────────────────────────
 export function SeekerInvitations({ invitations, setInvitations }: { invitations: Invitation[]; setInvitations: React.Dispatch<React.SetStateAction<Invitation[]>> }) {
+  useEffect(() => {
+    const toView = invitations.filter(i => i.status === 'sent' && !i.fromSeeker);
+    if (toView.length === 0) return;
+    setInvitations(prev => prev.map(i => toView.some(v => v.id === i.id) ? { ...i, status: 'viewed' as const } : i));
+    toView.forEach(i => {
+      fetch(`/api/invitations/${i.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'viewed' }),
+      }).catch(() => {});
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const respond = (id: string, status: 'accepted' | 'rejected') => {
     setInvitations(prev => prev.map(i => i.id === id ? { ...i, status } : i));
     fetch(`/api/invitations/${id}`, {

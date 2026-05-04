@@ -343,18 +343,27 @@ export function AdminVacancies({ vacancies, setVacancies }: {
 
 // ── Admin Users ────────────────────────────────────────────────────────────
 type UserRow = { id: string; name: string; org: string; inn: string; email: string; role: string; isActive: boolean; createdAt: string };
-
 const ROLE_LABELS: Record<string, string> = { employer: 'Работодатель', seeker: 'Соискатель', admin: 'Администратор' };
+
+type CreateEmpForm = { email: string; password: string; name: string; inn: string; region: string; city: string; contactName: string; phone: string };
+const emptyEmp = (): CreateEmpForm => ({ email: '', password: '', name: '', inn: '', region: '', city: '', contactName: '', phone: '' });
 
 export function AdminUsers({ employers: _ }: { employers: Employer[] }) {
   const [search, setSearch] = useState('');
   const [users, setUsers] = useState<UserRow[]>([]);
-  useEffect(() => {
-    fetch('/api/admin/users')
-      .then(r => r.ok ? r.json() : [])
-      .then(data => { if (Array.isArray(data)) setUsers(data); })
-      .catch(() => {});
-  }, []);
+  const [resetTarget, setResetTarget] = useState<UserRow | null>(null);
+  const [newPass, setNewPass] = useState('');
+  const [resetSaving, setResetSaving] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState<CreateEmpForm>(emptyEmp());
+  const [createSaving, setCreateSaving] = useState(false);
+  const [createError, setCreateError] = useState('');
+
+  const reload = () => {
+    fetch('/api/admin/users').then(r => r.ok ? r.json() : []).then(data => { if (Array.isArray(data)) setUsers(data); }).catch(() => {});
+  };
+  useEffect(reload, []);
+
   const filtered = users.filter(u =>
     (u.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
     (u.email ?? '').toLowerCase().includes(search.toLowerCase())
@@ -363,19 +372,103 @@ export function AdminUsers({ employers: _ }: { employers: Employer[] }) {
   const toggleActive = (id: string, current: boolean) => {
     setUsers(prev => prev.map(u => u.id === id ? { ...u, isActive: !current } : u));
     fetch(`/api/admin/users/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ isActive: !current }),
-    }).catch(() => {
-      setUsers(prev => prev.map(u => u.id === id ? { ...u, isActive: current } : u));
-    });
+    }).catch(() => { setUsers(prev => prev.map(u => u.id === id ? { ...u, isActive: current } : u)); });
   };
+
+  const doResetPassword = async () => {
+    if (!resetTarget || newPass.length < 6) return;
+    setResetSaving(true);
+    await fetch(`/api/admin/users/${resetTarget.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newPassword: newPass }),
+    }).catch(() => {});
+    setResetSaving(false);
+    setResetTarget(null);
+    setNewPass('');
+  };
+
+  const doCreateEmployer = async () => {
+    setCreateError('');
+    setCreateSaving(true);
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(createForm),
+      });
+      const data = await res.json();
+      if (!res.ok) { setCreateError(data.error ?? 'Ошибка'); return; }
+      setCreateOpen(false);
+      setCreateForm(emptyEmp());
+      reload();
+    } finally { setCreateSaving(false); }
+  };
+
+  const Modal = ({ children, title, onClose }: { children: React.ReactNode; title: string; onClose: () => void }) => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <h2 className="font-semibold text-slate-800">{title}</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition">✕</button>
+        </div>
+        <div className="p-5">{children}</div>
+      </div>
+    </div>
+  );
+
+  const F = ({ label, value, onChange, type = 'text', placeholder = '' }: { label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string }) => (
+    <div>
+      <label className="text-xs font-medium text-slate-600 mb-1 block">{label}</label>
+      <Input value={value} onChange={onChange} type={type} placeholder={placeholder} />
+    </div>
+  );
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <div className="mb-5">
-        <h1 className="text-xl font-bold text-slate-800">Пользователи</h1>
-        <p className="text-sm text-slate-500 mt-0.5">{users.length} всего</p>
+      {resetTarget && (
+        <Modal title={`Сброс пароля: ${resetTarget.name}`} onClose={() => { setResetTarget(null); setNewPass(''); }}>
+          <div className="space-y-3">
+            <F label="Новый пароль (мин. 6 символов)" value={newPass} onChange={setNewPass} type="password" placeholder="••••••" />
+            <div className="flex justify-end gap-2 pt-1">
+              <Btn variant="secondary" onClick={() => { setResetTarget(null); setNewPass(''); }}>Отмена</Btn>
+              <Btn variant="primary" disabled={newPass.length < 6 || resetSaving} onClick={doResetPassword}>
+                {resetSaving ? 'Сохранение...' : 'Сохранить'}
+              </Btn>
+            </div>
+          </div>
+        </Modal>
+      )}
+      {createOpen && (
+        <Modal title="Создать работодателя" onClose={() => { setCreateOpen(false); setCreateForm(emptyEmp()); setCreateError(''); }}>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <F label="Email" value={createForm.email} onChange={v => setCreateForm(f => ({ ...f, email: v }))} type="email" placeholder="info@company.ru" />
+              <F label="Пароль" value={createForm.password} onChange={v => setCreateForm(f => ({ ...f, password: v }))} type="password" placeholder="••••••" />
+              <div className="col-span-2"><F label="Название организации" value={createForm.name} onChange={v => setCreateForm(f => ({ ...f, name: v }))} placeholder="ООО Пример" /></div>
+              <F label="ИНН" value={createForm.inn} onChange={v => setCreateForm(f => ({ ...f, inn: v }))} placeholder="1234567890" />
+              <F label="Телефон" value={createForm.phone} onChange={v => setCreateForm(f => ({ ...f, phone: v }))} placeholder="+7 (999) 000-00-00" />
+              <F label="Регион" value={createForm.region} onChange={v => setCreateForm(f => ({ ...f, region: v }))} placeholder="Татарстан" />
+              <F label="Город" value={createForm.city} onChange={v => setCreateForm(f => ({ ...f, city: v }))} placeholder="Казань" />
+              <div className="col-span-2"><F label="Контактное лицо (ФИО)" value={createForm.contactName} onChange={v => setCreateForm(f => ({ ...f, contactName: v }))} placeholder="Иванов Иван Иванович" /></div>
+            </div>
+            {createError && <p className="text-xs text-red-600">{createError}</p>}
+            <div className="flex justify-end gap-2 pt-1">
+              <Btn variant="secondary" onClick={() => { setCreateOpen(false); setCreateForm(emptyEmp()); setCreateError(''); }}>Отмена</Btn>
+              <Btn variant="primary" disabled={createSaving} onClick={doCreateEmployer}>
+                {createSaving ? 'Создание...' : 'Создать'}
+              </Btn>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      <div className="mb-5 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-slate-800">Пользователи</h1>
+          <p className="text-sm text-slate-500 mt-0.5">{users.length} всего</p>
+        </div>
+        <Btn variant="primary" onClick={() => setCreateOpen(true)}>+ Добавить работодателя</Btn>
       </div>
       <div className="mb-4">
         <Input value={search} onChange={setSearch} placeholder="Поиск по имени, email..."
@@ -412,18 +505,26 @@ export function AdminUsers({ employers: _ }: { employers: Employer[] }) {
                 </td>
                 <td className="px-4 py-3 text-slate-400 text-xs">{fmtDate(u.createdAt)}</td>
                 <td className="px-4 py-3">
-                  {u.role !== 'admin' && (
+                  <div className="flex items-center gap-1.5">
                     <button
-                      onClick={() => toggleActive(u.id, u.isActive)}
-                      className={`text-xs px-2.5 py-1 rounded-lg border transition cursor-pointer ${
-                        u.isActive
-                          ? 'border-red-200 text-red-600 hover:bg-red-50'
-                          : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
-                      }`}
+                      onClick={() => { setResetTarget(u); setNewPass(''); }}
+                      className="text-xs px-2.5 py-1 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition"
                     >
-                      {u.isActive ? 'Заблокировать' : 'Разблокировать'}
+                      Пароль
                     </button>
-                  )}
+                    {u.role !== 'admin' && (
+                      <button
+                        onClick={() => toggleActive(u.id, u.isActive)}
+                        className={`text-xs px-2.5 py-1 rounded-lg border transition cursor-pointer ${
+                          u.isActive
+                            ? 'border-red-200 text-red-600 hover:bg-red-50'
+                            : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
+                        }`}
+                      >
+                        {u.isActive ? 'Заблокировать' : 'Разблокировать'}
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

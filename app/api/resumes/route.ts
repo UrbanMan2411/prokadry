@@ -104,6 +104,7 @@ export async function GET(_req: NextRequest) {
         documentRef: s.documentRef ?? '',
         disabilityGroup: s.disabilityGroup ?? '',
       })),
+      birthDate: session.role === 'SEEKER' ? r.birthDate.toISOString().slice(0, 10) : undefined,
       hasPhoto: r.hasPhoto,
       photo: r.photoUrl,
       publishedAt: (r.publishedAt ?? r.createdAt).toISOString(),
