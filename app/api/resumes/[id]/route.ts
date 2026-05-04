@@ -24,7 +24,7 @@ export async function PATCH(
       const {
         firstName, lastName, patronymic, gender, birthDate,
         photoUrl,
-        position, city, salary, experience,
+        position, city, region, salary, experience,
         education, educationInstitution, educationYears,
         workMode, about, status,
         workExperiences,
@@ -45,6 +45,7 @@ export async function PATCH(
       if (photoUrl !== undefined) { data.photoUrl = photoUrl || null; data.hasPhoto = !!photoUrl; }
       if (position !== undefined) data.position = position;
       if (city !== undefined) data.city = city;
+      if (region !== undefined) data.region = region;
       if (salary !== undefined) data.salary = salary ? Number(salary) : null;
       if (experience !== undefined) data.experience = Number(experience) || 0;
       if (education !== undefined) data.education = education;

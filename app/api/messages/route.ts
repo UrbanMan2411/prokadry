@@ -27,7 +27,7 @@ export async function GET(_req: NextRequest) {
         },
       },
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      take: 500,
     });
 
     function userName(u: {

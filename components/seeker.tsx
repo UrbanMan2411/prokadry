@@ -9,7 +9,7 @@ import { RUSSIA_CITIES, useRussiaMap, type MapCity } from '@/lib/use2gis';
 
 // ── Seeker Dashboard ───────────────────────────────────────────────────────
 export function SeekerDashboard({ invitations, messages, resumeStatus }: { invitations: Invitation[]; messages: Message[]; resumeStatus?: string }) {
-  const pendingInv = invitations.filter(i => i.status === 'sent' || i.status === 'viewed').length;
+  const pendingInv = invitations.filter(i => i.status === 'sent').length;
   const unreadMsg = messages.filter(m => !m.isRead).length;
   const resumeStatusLabel: Record<string, string> = { active: 'Активно', pending: 'На проверке', draft: 'Черновик', rejected: 'Отклонено', archived: 'В архиве' };
 
@@ -99,12 +99,13 @@ type ResumeFormFull = {
   specialStatuses: SpecialStatusEntry[];
   tests: TestEntry[];
   about: string;
+  region: string;
 };
 
 const emptyForm = (): ResumeFormFull => ({
   dbId: '', dbStatus: 'draft',
   firstName: '', lastName: '', patronymic: '', gender: 'FEMALE', birthDate: '',
-  city: '', phone: '', email: '', photoUrl: '',
+  city: '', region: '', phone: '', email: '', photoUrl: '',
   position: '', positionValid: true, salary: '', workMode: 'Офис',
   experience: '0', education: 'Высшее', educationInstitution: '', educationYears: '',
   workExperiences: [],
@@ -453,7 +454,7 @@ function resumeToForm(r: import('@/lib/types').Resume): ResumeFormFull {
     dbId: r.id, dbStatus: r.status,
     firstName: r.firstName, lastName: r.lastName, patronymic: r.patronymic ?? '', gender: r.gender,
     birthDate: r.birthDate ?? '',
-    city: r.city, phone: '', email: '', photoUrl: r.photo ?? '',
+    city: r.city, region: r.region ?? '', phone: '', email: '', photoUrl: r.photo ?? '',
     position: r.position, positionValid: true, salary: r.salary ? String(r.salary) : '', workMode: r.workMode,
     experience: String(r.experience), education: r.education,
     educationInstitution: r.educationInstitution ?? '', educationYears: r.educationYears ?? '',
@@ -545,7 +546,7 @@ export function MyResume() {
       const body: Record<string, unknown> = {
         firstName: form.firstName, lastName: form.lastName, patronymic: form.patronymic,
         gender: form.gender, birthDate: form.birthDate || undefined,
-        position: form.position, city: form.city,
+        position: form.position, city: form.city, region: form.region,
         photoUrl: form.photoUrl || null,
         salary: form.salary || null, experience: form.experience,
         education: form.education, educationInstitution: form.educationInstitution,
@@ -730,10 +731,14 @@ export function MyResume() {
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Город</label>
               <Input value={form.city} onChange={v => upd('city', v)} placeholder="Москва" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600 mb-1 block">Регион</label>
+              <Input value={form.region} onChange={v => upd('region', v)} placeholder="Республика Татарстан" />
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Телефон</label>
@@ -1212,6 +1217,10 @@ export function SeekerSettings() {
   });
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
+  const [pwError, setPwError] = useState('');
+  const [pwSaved, setPwSaved] = useState(false);
+  const [pwSaving, setPwSaving] = useState(false);
   const upd = (k: string, v: string | boolean) => { setForm(f => ({ ...f, [k]: v })); setSaved(false); };
 
   useEffect(() => {
@@ -1229,6 +1238,23 @@ export function SeekerSettings() {
     }).catch(() => {});
     setSaving(false);
     setSaved(true);
+  };
+
+  const handlePasswordChange = async () => {
+    setPwError('');
+    if (!pwForm.current) { setPwError('Введите текущий пароль'); return; }
+    if (pwForm.next.length < 6) { setPwError('Минимум 6 символов'); return; }
+    if (pwForm.next !== pwForm.confirm) { setPwError('Пароли не совпадают'); return; }
+    setPwSaving(true);
+    try {
+      const res = await fetch('/api/users/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: pwForm.current, newPassword: pwForm.next }),
+      });
+      if (res.ok) { setPwForm({ current: '', next: '', confirm: '' }); setPwSaved(true); setTimeout(() => setPwSaved(false), 3000); }
+      else { const d = await res.json().catch(() => ({})); setPwError(d.error ?? 'Ошибка'); }
+    } finally { setPwSaving(false); }
   };
 
   return (
@@ -1256,6 +1282,29 @@ export function SeekerSettings() {
             </div>
           </div>
           <p className="text-xs text-slate-400 mt-3">Имя, фамилия и email редактируются в разделе «Моё резюме».</p>
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-slate-800 mb-4">Смена пароля</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs font-medium text-slate-600 mb-1 block">Текущий пароль</label>
+              <Input value={pwForm.current} onChange={v => setPwForm(f => ({ ...f, current: v }))} type="password" placeholder="••••••" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600 mb-1 block">Новый пароль</label>
+              <Input value={pwForm.next} onChange={v => setPwForm(f => ({ ...f, next: v }))} type="password" placeholder="••••••" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600 mb-1 block">Повторите пароль</label>
+              <Input value={pwForm.confirm} onChange={v => setPwForm(f => ({ ...f, confirm: v }))} type="password" placeholder="••••••" />
+            </div>
+          </div>
+          {pwError && <p className="text-xs text-red-500 mt-2">{pwError}</p>}
+          <div className="flex items-center gap-3 mt-3">
+            {pwSaved && <span className="text-sm text-emerald-600">✓ Пароль изменён</span>}
+            <Btn variant="secondary" onClick={handlePasswordChange} disabled={pwSaving}>{pwSaving ? 'Сохранение…' : 'Изменить пароль'}</Btn>
+          </div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
@@ -1294,6 +1343,7 @@ export function SeekerVacancyRegistry({ vacancies }: { vacancies: Vacancy[] }) {
   const [activity, setActivity] = useState('');
   const [workMode, setWorkMode] = useState('');
   const [applyStatus, setApplyStatus] = useState<Record<string, 'loading' | 'done' | 'error'>>({});
+  const [modalVacancy, setModalVacancy] = useState<Vacancy | null>(null);
 
   const handleApply = async (vacancyId: string) => {
     setApplyStatus(prev => ({ ...prev, [vacancyId]: 'loading' }));
@@ -1354,7 +1404,8 @@ export function SeekerVacancyRegistry({ vacancies }: { vacancies: Vacancy[] }) {
           <div className="text-center py-16 text-slate-400">Вакансий не найдено</div>
         )}
         {active.map(v => (
-          <div key={v.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 hover:border-blue-200 transition">
+          <div key={v.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 hover:border-blue-200 transition cursor-pointer"
+            onClick={() => setModalVacancy(v)}>
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-slate-800 text-base">{v.title}</div>
@@ -1378,7 +1429,7 @@ export function SeekerVacancyRegistry({ vacancies }: { vacancies: Vacancy[] }) {
                   variant={applyStatus[v.id] === 'done' ? 'secondary' : 'primary'}
                   size="sm"
                   disabled={!!applyStatus[v.id]}
-                  onClick={() => handleApply(v.id)}
+                  onClick={e => { e.stopPropagation(); handleApply(v.id); }}
                 >
                   {applyStatus[v.id] === 'loading' ? '...' : applyStatus[v.id] === 'done' ? 'Отклик отправлен' : applyStatus[v.id] === 'error' ? 'Ошибка' : 'Откликнуться'}
                 </Btn>
@@ -1387,6 +1438,72 @@ export function SeekerVacancyRegistry({ vacancies }: { vacancies: Vacancy[] }) {
           </div>
         ))}
       </div>
+
+      {modalVacancy && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={() => setModalVacancy(null)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-slate-100 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-slate-800">{modalVacancy.title}</h2>
+                <div className="text-sm text-blue-600 mt-0.5">{modalVacancy.employerName}</div>
+              </div>
+              <button onClick={() => setModalVacancy(null)} className="text-slate-400 hover:text-slate-600 text-xl leading-none mt-0.5">✕</button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="flex flex-wrap gap-3 text-sm text-slate-600">
+                <span>{modalVacancy.city}{modalVacancy.region ? `, ${modalVacancy.region}` : ''}</span>
+                <span>·</span>
+                <span>{modalVacancy.workMode}</span>
+                {(modalVacancy.salaryFrom || modalVacancy.salaryTo) && (
+                  <>
+                    <span>·</span>
+                    <span className="font-semibold text-slate-800">{fmtSalary(modalVacancy.salaryFrom)}{modalVacancy.salaryTo ? ` – ${fmtSalary(modalVacancy.salaryTo)}` : ''}</span>
+                  </>
+                )}
+              </div>
+              {modalVacancy.description && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Описание</p>
+                  <p className="text-sm text-slate-700 whitespace-pre-line">{modalVacancy.description}</p>
+                </div>
+              )}
+              {modalVacancy.clientSpheres?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Сферы заказчика</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {modalVacancy.clientSpheres.map(s => <span key={s} className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 text-xs border border-purple-100">{s}</span>)}
+                  </div>
+                </div>
+              )}
+              {modalVacancy.specialistActivities?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Виды деятельности</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {modalVacancy.specialistActivities.map(a => <span key={a} className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs border border-blue-100">{a}</span>)}
+                  </div>
+                </div>
+              )}
+              {modalVacancy.skills?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Навыки</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {modalVacancy.skills.map(s => <span key={s} className="px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 text-xs border border-slate-100">{s}</span>)}
+                  </div>
+                </div>
+              )}
+              <div className="pt-2">
+                <Btn
+                  variant={applyStatus[modalVacancy.id] === 'done' ? 'secondary' : 'primary'}
+                  disabled={!!applyStatus[modalVacancy.id]}
+                  onClick={() => handleApply(modalVacancy.id)}
+                >
+                  {applyStatus[modalVacancy.id] === 'loading' ? '...' : applyStatus[modalVacancy.id] === 'done' ? 'Отклик отправлен' : applyStatus[modalVacancy.id] === 'error' ? 'Ошибка' : 'Откликнуться'}
+                </Btn>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -85,17 +85,18 @@ export function Btn({
 
 // ── Input ──────────────────────────────────────────────────────────────────
 export function Input({
-  value, onChange, placeholder, className = '', type = 'text', prefix, suffix, disabled,
+  value, onChange, placeholder, className = '', type = 'text', prefix, suffix, disabled, onKeyDown,
 }: {
   value: string; onChange: (v: string) => void; placeholder?: string;
   className?: string; type?: string; prefix?: ReactNode; suffix?: ReactNode; disabled?: boolean;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }) {
   return (
     <div className={`relative flex items-center ${className}`}>
       {prefix && <span className="absolute left-3 text-slate-400 pointer-events-none">{prefix}</span>}
       <input
         type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-        disabled={disabled}
+        disabled={disabled} onKeyDown={onKeyDown}
         className={`w-full rounded-lg border border-slate-200 bg-white text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed ${prefix ? 'pl-9' : 'pl-3'} ${suffix ? 'pr-9' : 'pr-3'} py-2`}
       />
       {suffix && <span className="absolute right-3 text-slate-400">{suffix}</span>}

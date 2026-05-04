@@ -882,6 +882,7 @@ function InvSortIcon({ col, sortCol, sortDir }: { col: InvSortCol; sortCol: InvS
 export function EmployerInvitations({ invitations, setInvitations }: { invitations: Invitation[]; setInvitations?: React.Dispatch<React.SetStateAction<Invitation[]>> }) {
   const [statusFilter, setStatusFilter] = useState('');
   const [candidateSearch, setCandidateSearch] = useState('');
+  const [vacancyFilter, setVacancyFilter] = useState('');
   const [sortCol, setSortCol] = useState<InvSortCol>(null);
   const [sortDir, setSortDir] = useState<InvSortDir>('asc');
   const [sortClickCount, setSortClickCount] = useState<Record<string, number>>({});
@@ -906,8 +907,11 @@ export function EmployerInvitations({ invitations, setInvitations }: { invitatio
     else { setSortCol(col); setSortDir('desc'); }
   };
 
+  const vacancyNames = [...new Set(invitations.map(i => i.vacancyTitle).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru'));
+
   let displayed = statusFilter ? invitations.filter(i => i.status === statusFilter) : invitations;
   if (candidateSearch) displayed = displayed.filter(i => i.candidateName.toLowerCase().includes(candidateSearch.toLowerCase()));
+  if (vacancyFilter) displayed = displayed.filter(i => i.vacancyTitle === vacancyFilter);
 
   if (sortCol) {
     displayed = [...displayed].sort((a, b) => {
@@ -957,16 +961,21 @@ export function EmployerInvitations({ invitations, setInvitations }: { invitatio
           prefix={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>}
           className="flex-1 max-w-xs"
         />
-        {(statusFilter || candidateSearch || sortCol) && (
+        <select value={vacancyFilter} onChange={e => setVacancyFilter(e.target.value)}
+          className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">Все вакансии</option>
+          {vacancyNames.map(n => <option key={n} value={n}>{n}</option>)}
+        </select>
+        {(statusFilter || candidateSearch || vacancyFilter || sortCol) && (
           <button
-            onClick={() => { setStatusFilter(''); setCandidateSearch(''); setSortCol(null); setSortClickCount({}); }}
+            onClick={() => { setStatusFilter(''); setCandidateSearch(''); setVacancyFilter(''); setSortCol(null); setSortClickCount({}); }}
             className="px-3 py-2 text-xs text-slate-500 hover:text-red-600 border border-slate-200 rounded-lg hover:border-red-200 transition"
           >
             Сбросить всё
           </button>
         )}
-        <div className="text-xs text-slate-400 self-center ml-auto">
-          Показано: {displayed.length} из {invitations.length} · Клик по заголовку — сортировка (3 состояния)
+        <div className="text-xs text-slate-400 self-center ml-auto whitespace-nowrap">
+          {displayed.length} из {invitations.length} · клик заголовок = сортировка
         </div>
       </div>
 

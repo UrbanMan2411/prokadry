@@ -9,17 +9,30 @@ import { Badge, Btn, Input, StatCard, StatusBadge, Avatar } from './ui';
 // ── Admin Dashboard ────────────────────────────────────────────────────────
 export function AdminDashboard({ logs }: { logs: AuditLog[] }) {
   const [s, setS] = useState<AdminStats>({ totalResumes: 0, activeResumes: 0, pendingResumes: 0, totalEmployers: 0, approvedEmployers: 0, totalVacancies: 0, activeVacancies: 0, totalInvitations: 0 });
-  useEffect(() => {
+  const [refreshing, setRefreshing] = useState(false);
+  const fetchStats = () => {
+    setRefreshing(true);
     fetch('/api/admin/stats')
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data && typeof data.totalResumes === 'number') setS(data); })
-      .catch(() => {});
-  }, []);
+      .catch(() => {})
+      .finally(() => setRefreshing(false));
+  };
+  useEffect(() => { fetchStats(); }, []);
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-slate-800">Панель администратора</h1>
-        <p className="text-sm text-slate-500 mt-0.5">Обзор системы ПРОкадры</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-slate-800">Панель администратора</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Обзор системы ПРОкадры</p>
+        </div>
+        <button onClick={fetchStats} disabled={refreshing}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition">
+          <svg className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Обновить
+        </button>
       </div>
 
       {/* Татарстан интеграция */}
@@ -536,57 +549,77 @@ export function AdminUsers({ employers: _ }: { employers: Employer[] }) {
 }
 
 // ── Admin Dictionaries ─────────────────────────────────────────────────────
+type DictItem = { id: string; value: string; label: string };
+
 export function AdminDicts() {
-  const [dicts, setDicts] = useState({ ...DICTIONARIES });
+  const [items, setItems] = useState<Record<string, DictItem[]>>({});
   const [newItem, setNewItem] = useState<Record<string, string>>({});
-  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState<Record<string, boolean>>({});
 
-  const addItem = (key: keyof typeof dicts) => {
-    const val = newItem[key]?.trim();
-    if (!val) return;
-    setDicts(d => ({ ...d, [key]: [...d[key], val] }));
-    setNewItem(n => ({ ...n, [key]: '' }));
-    setSaved(false);
-  };
-
-  const removeItem = (key: keyof typeof dicts, idx: number) => {
-    setDicts(d => ({ ...d, [key]: d[key].filter((_, i) => i !== idx) }));
-    setSaved(false);
-  };
-
-  const sections = [
-    { key: 'positions' as const, label: 'Должности' },
-    { key: 'activityAreas' as const, label: 'Сферы деятельности' },
-    { key: 'workModes' as const, label: 'Режимы работы' },
-    { key: 'educations' as const, label: 'Образование' },
-    { key: 'tests' as const, label: 'Тесты' },
-    { key: 'specialStatuses' as const, label: 'Особые статусы' },
+  const sections: { cat: string; label: string }[] = [
+    { cat: 'POSITION', label: 'Должности' },
+    { cat: 'ACTIVITY_AREA', label: 'Сферы деятельности' },
+    { cat: 'SKILL', label: 'Профессиональные навыки' },
+    { cat: 'PURCHASE_TYPE', label: 'Области закупок' },
+    { cat: 'SPECIAL_STATUS', label: 'Особые статусы' },
+    { cat: 'TEST', label: 'Тесты' },
   ];
+
+  useEffect(() => {
+    sections.forEach(({ cat }) => {
+      fetch(`/api/dict?category=${cat}`)
+        .then(r => r.ok ? r.json() : [])
+        .then((data: DictItem[]) => setItems(prev => ({ ...prev, [cat]: data })))
+        .catch(() => {});
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const addItem = async (cat: string) => {
+    const val = newItem[cat]?.trim();
+    if (!val) return;
+    setSaving(s => ({ ...s, [cat]: true }));
+    try {
+      const res = await fetch('/api/dict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category: cat, value: val, label: val }),
+      });
+      if (res.ok) {
+        const created: DictItem = await res.json();
+        setItems(prev => ({ ...prev, [cat]: [...(prev[cat] ?? []), created] }));
+        setNewItem(n => ({ ...n, [cat]: '' }));
+      }
+    } finally { setSaving(s => ({ ...s, [cat]: false })); }
+  };
+
+  const removeItem = async (cat: string, id: string) => {
+    setItems(prev => ({ ...prev, [cat]: (prev[cat] ?? []).filter(i => i.id !== id) }));
+    fetch('/api/dict', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    }).catch(() => {});
+  };
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-xl font-bold text-slate-800">Справочники</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Управление классификаторами платформы</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {saved && <span className="text-sm text-emerald-600">✓ Сохранено</span>}
-          <Btn variant="primary" onClick={() => setSaved(true)}>Сохранить изменения</Btn>
-        </div>
+      <div className="mb-5">
+        <h1 className="text-xl font-bold text-slate-800">Справочники</h1>
+        <p className="text-sm text-slate-500 mt-0.5">Управление классификаторами платформы</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {sections.map(({ key, label }) => (
-          <div key={key} className="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+        {sections.map(({ cat, label }) => (
+          <div key={cat} className="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
             <h3 className="text-sm font-semibold text-slate-800 mb-3">{label}</h3>
             <div className="space-y-1 mb-3 max-h-48 overflow-y-auto">
-              {dicts[key].map((item, i) => (
-                <div key={i} className="flex items-center justify-between gap-2 px-2 py-1 rounded hover:bg-slate-50 group">
-                  <span className="text-sm text-slate-700">{item}</span>
+              {(items[cat] ?? []).map(item => (
+                <div key={item.id} className="flex items-center justify-between gap-2 px-2 py-1 rounded hover:bg-slate-50 group">
+                  <span className="text-sm text-slate-700">{item.label}</span>
                   <button
-                    onClick={() => removeItem(key, i)}
-                    aria-label={`Удалить «${item}»`}
+                    onClick={() => removeItem(cat, item.id)}
+                    aria-label={`Удалить «${item.label}»`}
                     className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition focus-visible:opacity-100 focus-visible:outline-none focus-visible:text-red-500"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -595,15 +628,18 @@ export function AdminDicts() {
                   </button>
                 </div>
               ))}
+              {(items[cat] === undefined) && <p className="text-xs text-slate-400 px-2">Загрузка…</p>}
+              {(items[cat]?.length === 0) && <p className="text-xs text-slate-400 px-2">Нет элементов</p>}
             </div>
             <div className="flex gap-2">
               <Input
-                value={newItem[key] ?? ''}
-                onChange={v => setNewItem(n => ({ ...n, [key]: v }))}
+                value={newItem[cat] ?? ''}
+                onChange={v => setNewItem(n => ({ ...n, [cat]: v }))}
+                onKeyDown={e => { if (e.key === 'Enter') addItem(cat); }}
                 placeholder="Добавить..."
                 className="flex-1"
               />
-              <Btn size="sm" variant="secondary" onClick={() => addItem(key)}>+</Btn>
+              <Btn size="sm" variant="secondary" onClick={() => addItem(cat)} disabled={saving[cat]}>+</Btn>
             </div>
           </div>
         ))}

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import bcrypt from 'bcryptjs';
 import { db } from '@/lib/db';
 import { getSession } from '@/lib/session';
 
@@ -35,13 +36,25 @@ export async function PATCH(req: NextRequest) {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { phone } = await req.json();
+    const { phone, currentPassword, newPassword } = await req.json();
 
     if (session.role === 'EMPLOYER') {
       const emp = await db.employer.findUnique({ where: { userId: session.userId }, select: { id: true } });
       if (emp && phone !== undefined) {
         await db.employer.update({ where: { id: emp.id }, data: { phone } });
       }
+    }
+
+    if (currentPassword && newPassword) {
+      if (String(newPassword).length < 6) {
+        return NextResponse.json({ error: 'Минимум 6 символов' }, { status: 400 });
+      }
+      const user = await db.user.findUnique({ where: { id: session.userId }, select: { passwordHash: true } });
+      if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      const ok = await bcrypt.compare(String(currentPassword), user.passwordHash);
+      if (!ok) return NextResponse.json({ error: 'Неверный текущий пароль' }, { status: 400 });
+      const hash = await bcrypt.hash(String(newPassword), 10);
+      await db.user.update({ where: { id: session.userId }, data: { passwordHash: hash } });
     }
 
     return NextResponse.json({ ok: true });
