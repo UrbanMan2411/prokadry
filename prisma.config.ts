@@ -1,9 +1,9 @@
 import { defineConfig } from '@prisma/config';
 
-const databaseUrl = process.env.DATABASE_URL?.trim();
+const databaseUrl = process.env.DATABASE_URL?.trim() || process.env.TURSO_DATABASE_URL?.trim();
 
-if (!databaseUrl && process.env.NODE_ENV === 'production') {
-  throw new Error('DATABASE_URL is required in production');
+if (!databaseUrl && process.env.VERCEL_ENV === 'production') {
+  throw new Error('DATABASE_URL or TURSO_DATABASE_URL is required in production');
 }
 
 export default defineConfig({
