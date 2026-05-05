@@ -555,7 +555,16 @@ export function AdminUsers({ employers: _ }: { employers: Employer[] }) {
         />
       </div>
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm table-fixed">
+          <colgroup>
+            <col className="w-44" />
+            <col className="w-44" />
+            <col className="w-48" />
+            <col className="w-24" />
+            <col className="w-24" />
+            <col className="w-32" />
+            <col className="w-40" />
+          </colgroup>
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
               {['Имя', 'Организация', 'Email', 'Роль', 'Статус', 'Зарегистрирован', ''].map(h => (
@@ -567,13 +576,13 @@ export function AdminUsers({ employers: _ }: { employers: Employer[] }) {
             {filtered.map(u => (
               <tr key={u.id} className="hover:bg-slate-50 transition">
                 <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     <Avatar name={u.name} size="sm" />
-                    <span className="font-medium text-slate-800">{u.name}</span>
+                    <span className="font-medium text-slate-800 truncate">{u.name}</span>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-slate-500 text-xs max-w-[160px] truncate">{u.org || '—'}</td>
-                <td className="px-4 py-3 text-slate-500 text-xs">{u.email}</td>
+                <td className="px-4 py-3 text-slate-500 text-xs truncate" title={u.org || undefined}>{u.org || '—'}</td>
+                <td className="px-4 py-3 text-slate-500 text-xs truncate" title={u.email}>{u.email}</td>
                 <td className="px-4 py-3">
                   <Badge color={u.role === 'admin' ? 'purple' : u.role === 'employer' ? 'blue' : 'cyan'}>
                     {ROLE_LABELS[u.role] ?? u.role}
