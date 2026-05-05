@@ -504,7 +504,7 @@ export function AdminUsers({ employers: _ }: { employers: Employer[] }) {
   );
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-6 max-w-full">
       {resetTarget && (
         <Modal title={`Сброс пароля: ${resetTarget.name}`} onClose={() => { setResetTarget(null); setNewPass(''); }}>
           <div className="space-y-3">
@@ -555,14 +555,14 @@ export function AdminUsers({ employers: _ }: { employers: Employer[] }) {
         />
       </div>
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm overflow-x-auto">
-        <table className="w-full text-sm" style={{ tableLayout: 'fixed', minWidth: '860px' }}>
+        <table className="w-full text-sm" style={{ tableLayout: 'fixed', minWidth: '1000px' }}>
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
-              <th style={{ width: '160px' }} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Имя</th>
-              <th style={{ width: '180px' }} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Организация</th>
-              <th style={{ width: '180px' }} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Email</th>
-              <th style={{ width: '80px' }} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Роль</th>
-              <th style={{ width: '90px' }} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Статус</th>
+              <th style={{ width: '180px' }} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Имя</th>
+              <th style={{ width: '220px' }} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Организация</th>
+              <th style={{ width: '200px' }} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Email</th>
+              <th style={{ width: '100px' }} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Роль</th>
+              <th style={{ width: '100px' }} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Статус</th>
               <th style={{ width: '110px' }} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Зарег.</th>
               <th style={{ width: '170px' }} className="px-4 py-3" />
             </tr>
