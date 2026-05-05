@@ -699,11 +699,11 @@ function buildThreads(messages: Message[]): Thread[] {
     }
     if (!m.isRead && m.fromRole === 'candidate') t.unread = true;
   }
-  return [STATIC_AI_THREAD, ...Array.from(map.values())];
+  return Array.from(map.values());
 }
 
 export function EmployerMessages({ messages, onMarkRead }: { messages: Message[]; onMarkRead?: (id: string) => void }) {
-  const [threads, setThreads] = useState<Thread[]>(() => buildThreads(messages));
+  const [threads, setThreads] = useState<Thread[]>(() => [STATIC_AI_THREAD, ...buildThreads(messages)]);
   const [activeId, setActiveId] = useState<string | null>(null);
   useEffect(() => {
     setThreads(prev => {

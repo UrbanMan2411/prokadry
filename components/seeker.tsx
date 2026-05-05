@@ -1188,11 +1188,11 @@ function buildSeekerThreads(messages: Message[]): Thread[] {
     }
     if (!m.isRead && m.fromRole === 'employer') t.unread = true;
   }
-  return [STATIC_SEEKER_AI_THREAD, ...Array.from(map.values())];
+  return Array.from(map.values());
 }
 
 export function SeekerMessages({ messages, onMarkRead, email }: { messages: Message[]; onMarkRead?: (id: string) => void; email?: string }) {
-  const [threads, setThreads] = useState<Thread[]>(() => buildSeekerThreads(messages));
+  const [threads, setThreads] = useState<Thread[]>(() => [STATIC_SEEKER_AI_THREAD, ...buildSeekerThreads(messages)]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [reply, setReply] = useState('');
   const [aiTyping, setAiTyping] = useState(false);
