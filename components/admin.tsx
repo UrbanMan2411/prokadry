@@ -117,7 +117,7 @@ export function AdminResumes({ resumes, setResumes }: {
     fetch(`/api/resumes/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'ACTIVE' }) }).catch(() => {});
   };
   const reject = (id: string, reason: string) => {
-    setResumes(prev => prev.map(r => r.id === id ? { ...r, status: 'draft', rejectReason: reason || undefined } : r));
+    setResumes(prev => prev.map(r => r.id === id ? { ...r, status: 'rejected', rejectReason: reason || undefined } : r));
     fetch(`/api/resumes/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'REJECTED', rejectReason: reason || null }) }).catch(() => {});
     setRejectTarget(null);
     setRejectReason('');
@@ -154,6 +154,7 @@ export function AdminResumes({ resumes, setResumes }: {
           <option value="active">Активные</option>
           <option value="pending">На проверке</option>
           <option value="draft">Черновик</option>
+          <option value="rejected">Отклонено</option>
         </select>
       </div>
 
@@ -264,7 +265,7 @@ export function AdminEmployers({ employers, setEmployers }: {
     }).catch(() => {});
   };
   const reject = (id: string) => {
-    setEmployers(prev => prev.map(e => e.id === id ? { ...e, status: 'pending' } : e));
+    setEmployers(prev => prev.map(e => e.id === id ? { ...e, status: 'suspended' } : e));
     fetch(`/api/employers/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },

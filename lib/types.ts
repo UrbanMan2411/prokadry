@@ -1,6 +1,6 @@
 export type Role = 'employer' | 'seeker' | 'admin';
 
-export type ResumeStatus = 'active' | 'pending' | 'draft';
+export type ResumeStatus = 'active' | 'pending' | 'draft' | 'rejected';
 export type VacancyStatus = 'active' | 'archived' | 'draft';
 export type InvitationStatus = 'sent' | 'viewed' | 'accepted' | 'rejected';
 export type EmployerStatus = 'approved' | 'pending' | 'suspended';

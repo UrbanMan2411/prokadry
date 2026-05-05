@@ -26,7 +26,7 @@ export async function GET(_req: NextRequest) {
       // Seeker sees only their own resume (any status)
       resumeWhere = { userId: session.userId };
     } else if (session.role === 'ADMIN') {
-      resumeWhere = { status: { in: ['ACTIVE', 'PENDING', 'DRAFT'] } };
+      resumeWhere = { status: { in: ['ACTIVE', 'PENDING', 'DRAFT', 'REJECTED'] } };
     } else if (session.role === 'EMPLOYER') {
       const emp = await db.employer.findUnique({
         where: { userId: session.userId },
