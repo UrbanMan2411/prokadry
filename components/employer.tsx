@@ -662,16 +662,16 @@ const DETECTED_LABELS: Record<string, string> = {
 
 const AI_THREAD_ID = '__ai_assistant__';
 
+const STATIC_AI_THREAD: Thread = {
+  id: AI_THREAD_ID,
+  name: 'ПРОкадры Ассистент',
+  msgs: [{ id: 'ai-0', fromMe: false, text: 'Здравствуйте! Я ИИ-ассистент ПРОкадры. Помогу найти специалистов по 44-ФЗ / 223-ФЗ или отвечу на вопросы о платформе.', ts: '2020-01-01T00:00:00.000Z' }],
+  unread: false,
+  contactState: 'hidden',
+  contactInfo: { phone: '', email: '', telegram: '' },
+};
+
 function buildThreads(messages: Message[]): Thread[] {
-  const aiMsgs = loadAiMsgs();
-  const aiThread: Thread = {
-    id: AI_THREAD_ID,
-    name: 'ПРОкадры Ассистент',
-    msgs: aiMsgs.map(m => ({ id: m.id, fromMe: m.fromMe, text: m.text, ts: m.ts })),
-    unread: false,
-    contactState: 'hidden',
-    contactInfo: { phone: '', email: '', telegram: '' },
-  };
   const map = new Map<string, Thread>();
   for (const m of [...messages].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
     const cpId = m.counterpartyUserId;
@@ -699,21 +699,31 @@ function buildThreads(messages: Message[]): Thread[] {
     }
     if (!m.isRead && m.fromRole === 'candidate') t.unread = true;
   }
-  return [aiThread, ...Array.from(map.values())];
+  return [STATIC_AI_THREAD, ...Array.from(map.values())];
 }
 
 export function EmployerMessages({ messages, onMarkRead }: { messages: Message[]; onMarkRead?: (id: string) => void }) {
   const [threads, setThreads] = useState<Thread[]>(() => buildThreads(messages));
   const [activeId, setActiveId] = useState<string | null>(null);
-  useEffect(() => { setThreads(buildThreads(messages)); }, [messages]);
-  useEffect(() => subscribeAiMsgs(() => {
-    const aiMsgs = loadAiMsgs();
-    setThreads(prev => prev.map(t =>
-      t.id === AI_THREAD_ID
-        ? { ...t, msgs: aiMsgs.map(m => ({ id: m.id, fromMe: m.fromMe, text: m.text, ts: m.ts })) }
-        : t
-    ));
-  }), []);
+  useEffect(() => {
+    setThreads(prev => {
+      const humanThreads = buildThreads(messages);
+      const aiThread = prev.find(t => t.id === AI_THREAD_ID) ?? STATIC_AI_THREAD;
+      return [aiThread, ...humanThreads];
+    });
+  }, [messages]);
+  useEffect(() => {
+    const update = () => {
+      const aiMsgs = loadAiMsgs();
+      setThreads(prev => prev.map(t =>
+        t.id === AI_THREAD_ID
+          ? { ...t, msgs: aiMsgs.map(m => ({ id: m.id, fromMe: m.fromMe, text: m.text, ts: m.ts })) }
+          : t
+      ));
+    };
+    update(); // load from localStorage on mount
+    return subscribeAiMsgs(update);
+  }, []);
   const [reply, setReply] = useState('');
   const [aiTyping, setAiTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);

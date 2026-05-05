@@ -1162,15 +1162,15 @@ const AI_THREAD_ID = '__ai_assistant__';
 type ChatMsg = { id: string; fromMe: boolean; text: string; ts: string };
 type Thread  = { id: string; name: string; msgs: ChatMsg[]; unread: boolean; counterpartyUserId: string; hasContactRequest?: boolean };
 
+const STATIC_SEEKER_AI_THREAD: Thread = {
+  id: AI_THREAD_ID,
+  name: 'ПРОкадры Ассистент',
+  msgs: [{ id: 'ai-0', fromMe: false, text: 'Здравствуйте! Я ИИ-ассистент ПРОкадры. Помогу найти специалистов по 44-ФЗ / 223-ФЗ или отвечу на вопросы о платформе.', ts: '2020-01-01T00:00:00.000Z' }],
+  unread: false,
+  counterpartyUserId: AI_THREAD_ID,
+};
+
 function buildSeekerThreads(messages: Message[]): Thread[] {
-  const aiMsgs = loadAiMsgs();
-  const aiThread: Thread = {
-    id: AI_THREAD_ID,
-    name: 'ПРОкадры Ассистент',
-    msgs: aiMsgs.map(m => ({ id: m.id, fromMe: m.fromMe, text: m.text, ts: m.ts })),
-    unread: false,
-    counterpartyUserId: AI_THREAD_ID,
-  };
   const map = new Map<string, Thread>();
   for (const m of [...messages].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
     const cpId = m.counterpartyUserId;
@@ -1188,7 +1188,7 @@ function buildSeekerThreads(messages: Message[]): Thread[] {
     }
     if (!m.isRead && m.fromRole === 'employer') t.unread = true;
   }
-  return [aiThread, ...Array.from(map.values())];
+  return [STATIC_SEEKER_AI_THREAD, ...Array.from(map.values())];
 }
 
 export function SeekerMessages({ messages, onMarkRead, email }: { messages: Message[]; onMarkRead?: (id: string) => void; email?: string }) {
@@ -1198,15 +1198,25 @@ export function SeekerMessages({ messages, onMarkRead, email }: { messages: Mess
   const [aiTyping, setAiTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { setThreads(buildSeekerThreads(messages)); }, [messages]);
-  useEffect(() => subscribeAiMsgs(() => {
-    const aiMsgs = loadAiMsgs();
-    setThreads(prev => prev.map(t =>
-      t.id === AI_THREAD_ID
-        ? { ...t, msgs: aiMsgs.map(m => ({ id: m.id, fromMe: m.fromMe, text: m.text, ts: m.ts })) }
-        : t
-    ));
-  }), []);
+  useEffect(() => {
+    setThreads(prev => {
+      const humanThreads = buildSeekerThreads(messages);
+      const aiThread = prev.find(t => t.id === AI_THREAD_ID) ?? STATIC_SEEKER_AI_THREAD;
+      return [aiThread, ...humanThreads];
+    });
+  }, [messages]);
+  useEffect(() => {
+    const update = () => {
+      const aiMsgs = loadAiMsgs();
+      setThreads(prev => prev.map(t =>
+        t.id === AI_THREAD_ID
+          ? { ...t, msgs: aiMsgs.map(m => ({ id: m.id, fromMe: m.fromMe, text: m.text, ts: m.ts })) }
+          : t
+      ));
+    };
+    update(); // load from localStorage on mount
+    return subscribeAiMsgs(update);
+  }, []);
 
   const active = threads.find(t => t.id === activeId) ?? null;
 

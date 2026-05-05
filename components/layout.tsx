@@ -2,7 +2,7 @@
 
 import { ReactNode, useState, useRef, useEffect } from 'react';
 import type { Role } from '@/lib/types';
-import { loadAiMsgs, saveAiMsgs, subscribeAiMsgs, type AiMsg } from '@/lib/ai-chat-store';
+import { loadAiMsgs, saveAiMsgs, subscribeAiMsgs, GREETING, type AiMsg } from '@/lib/ai-chat-store';
 
 type Page = string;
 
@@ -188,7 +188,7 @@ function RobotIcon({ size = 36 }: { size?: number }) {
 
 function AIChatWidget() {
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<AiMsg[]>(() => loadAiMsgs());
+  const [messages, setMessages] = useState<AiMsg[]>([GREETING]);
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -201,7 +201,10 @@ function AIChatWidget() {
     }
   }, [open, messages]);
 
-  useEffect(() => subscribeAiMsgs(() => setMessages(loadAiMsgs())), []);
+  useEffect(() => {
+    setMessages(loadAiMsgs());
+    return subscribeAiMsgs(() => setMessages(loadAiMsgs()));
+  }, []);
 
   async function send() {
     const text = input.trim();
