@@ -1061,7 +1061,7 @@ export function SeekerInvitations({ invitations, setInvitations }: { invitations
                           <span className="text-xs text-slate-400">{fmtDate(inv.createdAt)}</span>
                         </div>
                       </div>
-                      {inv.status === 'sent' && (
+                      {(inv.status === 'sent' || inv.status === 'viewed') && (
                         <div className="mt-3 space-y-2">
                           <textarea
                             value={replyMsgs[inv.id] ?? ''}
