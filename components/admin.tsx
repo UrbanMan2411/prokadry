@@ -554,35 +554,34 @@ export function AdminUsers({ employers: _ }: { employers: Employer[] }) {
           prefix={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>}
         />
       </div>
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-        <table className="w-full text-sm table-fixed">
-          <colgroup>
-            <col className="w-44" />
-            <col className="w-44" />
-            <col className="w-48" />
-            <col className="w-24" />
-            <col className="w-24" />
-            <col className="w-32" />
-            <col className="w-40" />
-          </colgroup>
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm overflow-x-auto">
+        <table className="w-full text-sm" style={{ tableLayout: 'fixed', minWidth: '860px' }}>
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
-              {['Имя', 'Организация', 'Email', 'Роль', 'Статус', 'Зарегистрирован', ''].map(h => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
-              ))}
+              <th style={{ width: '160px' }} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Имя</th>
+              <th style={{ width: '180px' }} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Организация</th>
+              <th style={{ width: '180px' }} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Email</th>
+              <th style={{ width: '80px' }} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Роль</th>
+              <th style={{ width: '90px' }} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Статус</th>
+              <th style={{ width: '110px' }} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Зарег.</th>
+              <th style={{ width: '170px' }} className="px-4 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filtered.map(u => (
               <tr key={u.id} className="hover:bg-slate-50 transition">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2 min-w-0">
+                <td className="px-4 py-3 overflow-hidden">
+                  <div className="flex items-center gap-2">
                     <Avatar name={u.name} size="sm" />
-                    <span className="font-medium text-slate-800 truncate">{u.name}</span>
+                    <span className="font-medium text-slate-800 truncate block min-w-0">{u.name}</span>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-slate-500 text-xs truncate" title={u.org || undefined}>{u.org || '—'}</td>
-                <td className="px-4 py-3 text-slate-500 text-xs truncate" title={u.email}>{u.email}</td>
+                <td className="px-4 py-3 text-slate-500 text-xs overflow-hidden" title={u.org || undefined}>
+                  <span className="truncate block">{u.org || '—'}</span>
+                </td>
+                <td className="px-4 py-3 text-slate-500 text-xs overflow-hidden" title={u.email}>
+                  <span className="truncate block">{u.email}</span>
+                </td>
                 <td className="px-4 py-3">
                   <Badge color={u.role === 'admin' ? 'purple' : u.role === 'employer' ? 'blue' : 'cyan'}>
                     {ROLE_LABELS[u.role] ?? u.role}
