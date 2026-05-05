@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Resume, Vacancy, Invitation, Message } from '@/lib/types';
 import { fmtSalary, fmtDate, fmtExp } from '@/lib/utils';
+import { loadAiMsgs, saveAiMsgs, subscribeAiMsgs } from '@/lib/ai-chat-store';
 import { Badge, Btn, Input, Select, Modal, Avatar, StarBtn, StatusBadge, StatCard, EmptyState } from './ui';
 import { InviteModal, MessageModal } from './resume';
 import { DICTIONARIES } from '@/lib/mock-data';
@@ -661,16 +662,16 @@ const DETECTED_LABELS: Record<string, string> = {
 
 const AI_THREAD_ID = '__ai_assistant__';
 
-const AI_THREAD: Thread = {
-  id: AI_THREAD_ID,
-  name: 'ПРОкадры Ассистент',
-  msgs: [{ id: 'ai-0', fromMe: false, text: 'Здравствуйте! Я ИИ-ассистент ПРОкадры. Помогу найти специалистов по 44-ФЗ / 223-ФЗ или отвечу на вопросы о платформе.', ts: new Date().toISOString() }],
-  unread: false,
-  contactState: 'hidden',
-  contactInfo: { phone: '', email: '', telegram: '' },
-};
-
 function buildThreads(messages: Message[]): Thread[] {
+  const aiMsgs = loadAiMsgs();
+  const aiThread: Thread = {
+    id: AI_THREAD_ID,
+    name: 'ПРОкадры Ассистент',
+    msgs: aiMsgs.map(m => ({ id: m.id, fromMe: m.fromMe, text: m.text, ts: m.ts })),
+    unread: false,
+    contactState: 'hidden',
+    contactInfo: { phone: '', email: '', telegram: '' },
+  };
   const map = new Map<string, Thread>();
   for (const m of [...messages].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
     const cpId = m.counterpartyUserId;
@@ -698,13 +699,21 @@ function buildThreads(messages: Message[]): Thread[] {
     }
     if (!m.isRead && m.fromRole === 'candidate') t.unread = true;
   }
-  return [AI_THREAD, ...Array.from(map.values())];
+  return [aiThread, ...Array.from(map.values())];
 }
 
 export function EmployerMessages({ messages, onMarkRead }: { messages: Message[]; onMarkRead?: (id: string) => void }) {
   const [threads, setThreads] = useState<Thread[]>(() => buildThreads(messages));
   const [activeId, setActiveId] = useState<string | null>(null);
   useEffect(() => { setThreads(buildThreads(messages)); }, [messages]);
+  useEffect(() => subscribeAiMsgs(() => {
+    const aiMsgs = loadAiMsgs();
+    setThreads(prev => prev.map(t =>
+      t.id === AI_THREAD_ID
+        ? { ...t, msgs: aiMsgs.map(m => ({ id: m.id, fromMe: m.fromMe, text: m.text, ts: m.ts })) }
+        : t
+    ));
+  }), []);
   const [reply, setReply] = useState('');
   const [aiTyping, setAiTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -724,8 +733,8 @@ export function EmployerMessages({ messages, onMarkRead }: { messages: Message[]
 
     if (activeId === AI_THREAD_ID) {
       setAiTyping(true);
+      const currentMsgs = threads.find(t => t.id === AI_THREAD_ID)?.msgs ?? [];
       try {
-        const currentMsgs = threads.find(t => t.id === AI_THREAD_ID)?.msgs ?? [];
         const apiMessages = [...currentMsgs, msg].map(m => ({
           role: m.fromMe ? 'user' : 'assistant',
           content: m.text,
@@ -738,9 +747,11 @@ export function EmployerMessages({ messages, onMarkRead }: { messages: Message[]
         const data = await res.json();
         const aiMsg: ChatMsg = { id: `ai-${Date.now()}`, fromMe: false, text: data.reply ?? 'Ошибка ответа.', ts: new Date().toISOString() };
         setThreads(prev => prev.map(t => t.id === AI_THREAD_ID ? { ...t, msgs: [...t.msgs, aiMsg] } : t));
+        saveAiMsgs([...currentMsgs, msg, aiMsg].map(m => ({ id: m.id, fromMe: m.fromMe, text: m.text, ts: m.ts })));
       } catch {
         const errMsg: ChatMsg = { id: `ai-err-${Date.now()}`, fromMe: false, text: 'Не удалось подключиться к ассистенту.', ts: new Date().toISOString() };
         setThreads(prev => prev.map(t => t.id === AI_THREAD_ID ? { ...t, msgs: [...t.msgs, errMsg] } : t));
+        saveAiMsgs([...currentMsgs, msg, errMsg].map(m => ({ id: m.id, fromMe: m.fromMe, text: m.text, ts: m.ts })));
       } finally {
         setAiTyping(false);
       }

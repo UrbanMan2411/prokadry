@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Invitation, Message, Vacancy } from '@/lib/types';
 import { fmtDate, fmtSalary } from '@/lib/utils';
+import { loadAiMsgs, saveAiMsgs, subscribeAiMsgs } from '@/lib/ai-chat-store';
 import { Badge, Btn, Input, Select, Avatar, StatusBadge, StatCard } from './ui';
 import { DICTIONARIES } from '@/lib/mock-data';
 import { RUSSIA_CITIES, useRussiaMap, type MapCity } from '@/lib/use2gis';
@@ -1157,10 +1158,19 @@ export function SeekerInvitations({ invitations, setInvitations }: { invitations
 }
 
 // ── Seeker Messages ────────────────────────────────────────────────────────
+const AI_THREAD_ID = '__ai_assistant__';
 type ChatMsg = { id: string; fromMe: boolean; text: string; ts: string };
 type Thread  = { id: string; name: string; msgs: ChatMsg[]; unread: boolean; counterpartyUserId: string; hasContactRequest?: boolean };
 
 function buildSeekerThreads(messages: Message[]): Thread[] {
+  const aiMsgs = loadAiMsgs();
+  const aiThread: Thread = {
+    id: AI_THREAD_ID,
+    name: 'ПРОкадры Ассистент',
+    msgs: aiMsgs.map(m => ({ id: m.id, fromMe: m.fromMe, text: m.text, ts: m.ts })),
+    unread: false,
+    counterpartyUserId: AI_THREAD_ID,
+  };
   const map = new Map<string, Thread>();
   for (const m of [...messages].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
     const cpId = m.counterpartyUserId;
@@ -1178,14 +1188,25 @@ function buildSeekerThreads(messages: Message[]): Thread[] {
     }
     if (!m.isRead && m.fromRole === 'employer') t.unread = true;
   }
-  return Array.from(map.values());
+  return [aiThread, ...Array.from(map.values())];
 }
 
 export function SeekerMessages({ messages, onMarkRead, email }: { messages: Message[]; onMarkRead?: (id: string) => void; email?: string }) {
   const [threads, setThreads] = useState<Thread[]>(() => buildSeekerThreads(messages));
   const [activeId, setActiveId] = useState<string | null>(null);
   const [reply, setReply] = useState('');
+  const [aiTyping, setAiTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setThreads(buildSeekerThreads(messages)); }, [messages]);
+  useEffect(() => subscribeAiMsgs(() => {
+    const aiMsgs = loadAiMsgs();
+    setThreads(prev => prev.map(t =>
+      t.id === AI_THREAD_ID
+        ? { ...t, msgs: aiMsgs.map(m => ({ id: m.id, fromMe: m.fromMe, text: m.text, ts: m.ts })) }
+        : t
+    ));
+  }), []);
 
   const active = threads.find(t => t.id === activeId) ?? null;
 
@@ -1205,9 +1226,33 @@ export function SeekerMessages({ messages, onMarkRead, email }: { messages: Mess
     }).catch(() => {});
   };
 
-  const send = () => {
+  const send = async () => {
     const text = reply.trim();
     if (!activeId || text.length < 2) return;
+
+    if (activeId === AI_THREAD_ID) {
+      const msg: ChatMsg = { id: Date.now().toString(), fromMe: true, text, ts: new Date().toISOString() };
+      const currentMsgs = threads.find(t => t.id === AI_THREAD_ID)?.msgs ?? [];
+      setThreads(prev => prev.map(t => t.id === AI_THREAD_ID ? { ...t, msgs: [...t.msgs, msg] } : t));
+      setReply('');
+      setAiTyping(true);
+      try {
+        const apiMessages = [...currentMsgs, msg].map(m => ({ role: m.fromMe ? 'user' : 'assistant', content: m.text }));
+        const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: apiMessages.slice(-10) }) });
+        const data = await res.json();
+        const aiMsg: ChatMsg = { id: `ai-${Date.now()}`, fromMe: false, text: data.reply ?? 'Ошибка ответа.', ts: new Date().toISOString() };
+        setThreads(prev => prev.map(t => t.id === AI_THREAD_ID ? { ...t, msgs: [...t.msgs, aiMsg] } : t));
+        saveAiMsgs([...currentMsgs, msg, aiMsg].map(m => ({ id: m.id, fromMe: m.fromMe, text: m.text, ts: m.ts })));
+      } catch {
+        const errMsg: ChatMsg = { id: `ai-err-${Date.now()}`, fromMe: false, text: 'Не удалось подключиться к ассистенту.', ts: new Date().toISOString() };
+        setThreads(prev => prev.map(t => t.id === AI_THREAD_ID ? { ...t, msgs: [...t.msgs, errMsg] } : t));
+        saveAiMsgs([...currentMsgs, msg, errMsg].map(m => ({ id: m.id, fromMe: m.fromMe, text: m.text, ts: m.ts })));
+      } finally {
+        setAiTyping(false);
+      }
+      return;
+    }
+
     const t = threads.find(thr => thr.id === activeId);
     const msg: ChatMsg = { id: Date.now().toString(), fromMe: true, text, ts: new Date().toISOString() };
     setThreads(prev => prev.map(thr => thr.id === activeId ? { ...thr, msgs: [...thr.msgs, msg], unread: false } : thr));
@@ -1283,6 +1328,16 @@ export function SeekerMessages({ messages, onMarkRead, email }: { messages: Mess
                   </div>
                 </div>
               ))}
+              {active.id === AI_THREAD_ID && aiTyping && (
+                <div className="flex gap-3">
+                  <Avatar name="ПРОкадры Ассистент" size="sm" />
+                  <div className="bg-slate-100 text-slate-700 rounded-2xl px-4 py-2.5 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                </div>
+              )}
               <div ref={bottomRef} />
             </div>
             <div className="p-3 border-t border-slate-100 flex gap-2 items-end">

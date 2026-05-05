@@ -2,6 +2,7 @@
 
 import { ReactNode, useState, useRef, useEffect } from 'react';
 import type { Role } from '@/lib/types';
+import { loadAiMsgs, saveAiMsgs, subscribeAiMsgs, type AiMsg } from '@/lib/ai-chat-store';
 
 type Page = string;
 
@@ -178,8 +179,6 @@ export function Header({
   );
 }
 
-type ChatMessage = { id: number; role: 'user' | 'ai'; text: string };
-
 function RobotIcon({ size = 36 }: { size?: number }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
@@ -189,9 +188,7 @@ function RobotIcon({ size = 36 }: { size?: number }) {
 
 function AIChatWidget() {
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 0, role: 'ai', text: 'Здравствуйте! Я ИИ-ассистент ПРОкадры. Помогу найти специалистов по 44-ФЗ / 223-ФЗ или отвечу на вопросы о платформе.' },
-  ]);
+  const [messages, setMessages] = useState<AiMsg[]>(() => loadAiMsgs());
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -204,12 +201,15 @@ function AIChatWidget() {
     }
   }, [open, messages]);
 
+  useEffect(() => subscribeAiMsgs(() => setMessages(loadAiMsgs())), []);
+
   async function send() {
     const text = input.trim();
     if (!text || typing) return;
-    const userMsg: ChatMessage = { id: Date.now(), role: 'user', text };
+    const userMsg: AiMsg = { id: String(Date.now()), fromMe: true, text, ts: new Date().toISOString() };
     const next = [...messages, userMsg];
     setMessages(next);
+    saveAiMsgs(next);
     setInput('');
     setTyping(true);
     try {
@@ -218,14 +218,20 @@ function AIChatWidget() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: next
-            .filter(m => m.role !== 'ai' || m.id !== 0)
-            .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })),
+            .filter(m => m.id !== 'ai-0')
+            .map(m => ({ role: m.fromMe ? 'user' : 'assistant', content: m.text })),
         }),
       });
       const data = await res.json();
-      setMessages(prev => [...prev, { id: Date.now() + 1, role: 'ai', text: data.reply ?? 'Ошибка ответа.' }]);
+      const aiMsg: AiMsg = { id: `ai-${Date.now() + 1}`, fromMe: false, text: data.reply ?? 'Ошибка ответа.', ts: new Date().toISOString() };
+      const withAi = [...next, aiMsg];
+      setMessages(withAi);
+      saveAiMsgs(withAi);
     } catch {
-      setMessages(prev => [...prev, { id: Date.now() + 1, role: 'ai', text: 'Не удалось подключиться к ассистенту.' }]);
+      const errMsg: AiMsg = { id: `ai-err-${Date.now()}`, fromMe: false, text: 'Не удалось подключиться к ассистенту.', ts: new Date().toISOString() };
+      const withErr = [...next, errMsg];
+      setMessages(withErr);
+      saveAiMsgs(withErr);
     } finally {
       setTyping(false);
     }
@@ -262,14 +268,14 @@ function AIChatWidget() {
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5 bg-slate-50">
           {messages.map(msg => (
-            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} gap-2`}>
-              {msg.role === 'ai' && (
+            <div key={msg.id} className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'} gap-2`}>
+              {!msg.fromMe && (
                 <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 mt-0.5">
                   <RobotIcon size={28} />
                 </div>
               )}
               <div
-                className={`max-w-[220px] px-3 py-2 rounded-2xl text-[13px] leading-snug ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-white text-slate-700 border border-slate-100 shadow-sm rounded-bl-sm'}`}
+                className={`max-w-[220px] px-3 py-2 rounded-2xl text-[13px] leading-snug ${msg.fromMe ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-white text-slate-700 border border-slate-100 shadow-sm rounded-bl-sm'}`}
               >
                 {msg.text}
               </div>
